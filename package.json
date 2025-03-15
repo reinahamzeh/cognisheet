@@ -1,27 +1,70 @@
 {
   "name": "cognisheet",
   "version": "0.1.0",
-  "private": true,
+  "description": "A user-friendly spreadsheet tool with a chat interface for natural language queries",
+  "main": "main.js",
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "start": "electron .",
+    "dev": "vite",
+    "build": "vite build",
+    "electron-dev": "concurrently \"npm run dev\" \"electron .\"",
+    "web-dev": "concurrently \"npm run dev\" \"node server.js\"",
+    "server": "node server.js",
+    "package": "electron-builder",
+    "test": "jest",
+    "lint": "eslint ."
   },
+  "keywords": [
+    "spreadsheet",
+    "chat",
+    "natural-language",
+    "data-analysis"
+  ],
+  "author": "",
+  "license": "MIT",
   "dependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "next": "15.3.0-canary.5"
+    "chart.js": "^4.4.1",
+    "compromise": "^14.10.0",
+    "electron-store": "^8.1.0",
+    "express": "^4.18.2",
+    "papaparse": "^5.4.1",
+    "react": "^18.2.0",
+    "react-chartjs-2": "^5.2.0",
+    "react-dom": "^18.2.0",
+    "react-grid-layout": "^1.4.4",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "styled-components": "^6.1.8",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "typescript": "^5",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
-    "eslint": "^9",
-    "eslint-config-next": "15.3.0-canary.5",
-    "@eslint/eslintrc": "^3"
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/react": "^14.2.1",
+    "@types/react": "^18.2.55",
+    "@types/react-dom": "^18.2.19",
+    "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^8.2.2",
+    "cypress": "^13.6.4",
+    "electron": "^22.3.27",
+    "electron-builder": "^23.6.0",
+    "eslint": "^8.56.0",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "jest": "^29.7.0",
+    "prettier": "^2.8.8",
+    "vite": "^4.5.2"
+  },
+  "build": {
+    "appId": "com.cognisheet.app",
+    "productName": "Cognisheet",
+    "mac": {
+      "category": "public.app-category.productivity"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
   }
 }
