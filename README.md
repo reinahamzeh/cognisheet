@@ -117,3 +117,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - Inspired by tools like Notion, Cursor, and sheetlang.ai
 - Built for non-technical users who want to interact with spreadsheet data easily
+# cognisheet
