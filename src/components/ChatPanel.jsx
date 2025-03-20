@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { useChat } from '../context/ChatContext';
 import ChartDisplay from './ChartDisplay';
+import { useSpreadsheet } from '../context/SpreadsheetContext';
 
 const ChatContainer = styled.div`
   display: flex;
@@ -18,23 +19,25 @@ const ChatHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background-color: ${({ theme }) => theme.colors.primary};
   
   h2 {
     font-size: ${({ theme }) => theme.fontSizes.h2};
     margin: 0;
-    color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.white};
   }
 `;
 
 const ClearButton = styled.button`
   font-size: ${({ theme }) => theme.fontSizes.small};
-  color: ${({ theme }) => theme.colors.darkGray};
+  color: ${({ theme }) => theme.colors.white};
   background: none;
   border: none;
   cursor: pointer;
+  opacity: 0.7;
   
   &:hover {
-    color: ${({ theme }) => theme.colors.primary};
+    opacity: 1;
   }
 `;
 
@@ -66,11 +69,29 @@ const Message = styled.div`
         color: ${theme.colors.error};
         border: 1px solid ${theme.colors.error}40;
       `;
+    } else if (type === 'system') {
+      return `
+        align-self: center;
+        background-color: ${theme.colors.lightGray}80;
+        color: ${theme.colors.text};
+        font-style: italic;
+        font-size: 0.9em;
+        padding: ${theme.spacing.small};
+      `;
+    } else if (type === 'formula') {
+      return `
+        align-self: flex-start;
+        background-color: ${theme.colors.accent}20;
+        color: ${theme.colors.text};
+        border: 1px solid ${theme.colors.accent}40;
+        font-family: monospace;
+      `;
     } else {
       return `
         align-self: flex-start;
         background-color: ${theme.colors.lightGray};
         color: ${theme.colors.text};
+        border: 1px solid ${theme.colors.lightGray};
       `;
     }
   }}
@@ -86,6 +107,8 @@ const InputContainer = styled.div`
 const Input = styled.input`
   flex: 1;
   padding: ${({ theme }) => theme.spacing.small};
+  background-color: ${({ theme }) => theme.colors.white};
+  color: ${({ theme }) => theme.colors.text};
   border: 1px solid ${({ theme }) => theme.colors.lightGray};
   border-radius: ${({ theme }) => theme.borderRadius.small};
   
@@ -93,6 +116,11 @@ const Input = styled.input`
     outline: none;
     border-color: ${({ theme }) => theme.colors.primary};
     box-shadow: 0 0 0 2px ${({ theme }) => theme.colors.primary}20;
+  }
+
+  &::placeholder {
+    color: ${({ theme }) => theme.colors.text};
+    opacity: 0.5;
   }
 `;
 
@@ -105,12 +133,12 @@ const SendButton = styled.button`
   cursor: pointer;
   transition: all ${({ theme }) => theme.transitions.fast};
   
-  &:hover {
-    opacity: 0.9;
+  &:hover:not(:disabled) {
+    background-color: ${({ theme }) => theme.colors.accent};
   }
   
   &:disabled {
-    background-color: ${({ theme }) => theme.colors.lightGray};
+    opacity: 0.5;
     cursor: not-allowed;
   }
 `;
@@ -123,7 +151,8 @@ const EmptyState = styled.div`
   height: 100%;
   padding: ${({ theme }) => theme.spacing.base};
   text-align: center;
-  color: ${({ theme }) => theme.colors.darkGray};
+  color: ${({ theme }) => theme.colors.text};
+  opacity: 0.7;
   
   p {
     margin-bottom: ${({ theme }) => theme.spacing.base};
@@ -139,8 +168,40 @@ const EmptyState = styled.div`
   }
 `;
 
+const FormulaButton = styled.button`
+  display: block;
+  margin-top: ${({ theme }) => theme.spacing.small};
+  padding: ${({ theme }) => theme.spacing.small};
+  background-color: ${({ theme }) => theme.colors.accent};
+  color: ${({ theme }) => theme.colors.white};
+  border: none;
+  border-radius: ${({ theme }) => theme.borderRadius.small};
+  cursor: pointer;
+  font-size: 0.9em;
+  
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.primary};
+  }
+`;
+
+const ResearchResult = styled.div`
+  margin-top: ${({ theme }) => theme.spacing.small};
+  padding: ${({ theme }) => theme.spacing.small};
+  background-color: ${({ theme }) => theme.colors.lightGray}30;
+  border-radius: ${({ theme }) => theme.borderRadius.small};
+  font-size: 0.9em;
+`;
+
 const ChatPanel = () => {
-  const { messages, inputValue, setInputValue, sendMessage, clearChat, isProcessing } = useChat();
+  const { 
+    messages, 
+    inputValue, 
+    setInputValue, 
+    sendMessage, 
+    clearChat, 
+    isProcessing
+  } = useChat();
+  const { updateCell } = useSpreadsheet();
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   
@@ -162,10 +223,26 @@ const ChatPanel = () => {
     }
   };
   
+  // Handle applying a formula to the selected range
+  const handleApplyFormula = (formula) => {
+    if (updateCell && formula) {
+      // Extract the range from the formula (e.g., "=SUM(A1:B5)" -> "A1:B5")
+      const rangeMatch = formula.match(/\(([A-Z][0-9]+:[A-Z][0-9]+)\)/);
+      
+      if (rangeMatch && rangeMatch[1]) {
+        const range = rangeMatch[1];
+        const [startCell, endCell] = range.split(':');
+        
+        // Apply the formula to the end cell of the range
+        updateCell(endCell.charAt(0), parseInt(endCell.slice(1)), formula);
+      }
+    }
+  };
+  
   return (
     <ChatContainer>
       <ChatHeader>
-        <h2>Chat</h2>
+        <h2>AI Assistant</h2>
         {messages.length > 0 && (
           <ClearButton onClick={clearChat}>Clear</ClearButton>
         )}
@@ -179,6 +256,9 @@ const ChatPanel = () => {
               <li>Select data and ask "What's the average?"</li>
               <li>Select two columns and say "Create a bar chart"</li>
               <li>Try "What's the maximum value in column A?"</li>
+              <li>"Generate a sum formula for this range"</li>
+              <li>"Analyze this data and tell me insights"</li>
+              <li>"Summarize what this spreadsheet contains"</li>
             </ul>
             <p>Use Cmd+K to quickly select data</p>
           </EmptyState>
@@ -191,6 +271,36 @@ const ChatPanel = () => {
                   data={message.data} 
                   title={message.content} 
                 />
+              ) : message.type === 'formula' ? (
+                <Message type="formula">
+                  {message.content}
+                  <FormulaButton onClick={() => handleApplyFormula(message.formula)}>
+                    Apply Formula
+                  </FormulaButton>
+                </Message>
+              ) : message.type === 'research' ? (
+                <Message type="response">
+                  {message.content}
+                  {message.results && (
+                    <ResearchResult>
+                      {message.results.map((result, idx) => (
+                        <div key={idx}>
+                          <strong>{result.title}</strong>
+                          <p>{result.description}</p>
+                        </div>
+                      ))}
+                    </ResearchResult>
+                  )}
+                </Message>
+              ) : message.type === 'extraction' ? (
+                <Message type="response">
+                  {message.content}
+                  {message.data && (
+                    <ResearchResult>
+                      <p>Extracted {message.data.length} rows of data</p>
+                    </ResearchResult>
+                  )}
+                </Message>
               ) : (
                 <Message type={message.type}>
                   {message.content}
@@ -209,7 +319,7 @@ const ChatPanel = () => {
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Ask a question about your data..."
+            placeholder="Ask AI about your data..."
             disabled={isProcessing}
           />
           <SendButton type="submit" disabled={!inputValue.trim() || isProcessing}>

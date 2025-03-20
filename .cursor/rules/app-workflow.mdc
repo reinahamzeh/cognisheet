@@ -1,0 +1,129 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Below is the **App Workflow Document** for the described application, based on the provided details and structured according to the specified sections. This document focuses solely on user workflows and interactions, ensuring clarity and simplicity to guide designers and developers in creating a seamless user experience.
+
+---
+
+# App Workflow Document for Chat-Based Spreadsheet Tool
+
+## Overview of the App Workflow
+
+The Chat-Based Spreadsheet Tool is a user-friendly application designed to simplify spreadsheet analysis for non-technical users. Inspired by tools like Notion, Cursor, and [sheetlang.ai](mdc:http:/sheetlang.ai), its core purpose is to make data interaction effortless and accessible by allowing users to upload local spreadsheet files (e.g., .csv, .xls) and use natural language queries via a chat interface. The app supports tasks such as basic calculations (e.g., sums, averages) and generating simple visualizations (e.g., bar or line charts), all while prioritizing ease of use and privacy through local data handling for the Minimum Viable Product (MVP). 
+
+The overall user journey begins with onboarding, where users upload a spreadsheet file. They then engage in core interactions through the chat interface to perform data queries or create visualizations, with results displayed within the app. Finally, users exit the app, with their data remaining local unless saved manually (if implemented). This workflow aims to eliminate the complexity of traditional spreadsheet tools, making data analysis intuitive for users without technical expertise.
+
+## User Roles and Scenarios
+
+### User Role
+- **General User**: The app targets non-technical individuals who work with spreadsheets, such as small business owners, freelancers, students, and data analysts seeking to avoid complex formulas. No distinct user roles (e.g., Admin, Guest) are specified beyond this general audience.
+
+### Scenarios
+- **Small Business Owner**: Uploads a .csv file of sales data to calculate total sales or average sales per product for quick financial insights.
+- **Student**: Uploads a dataset for a school project and generates a bar chart to include in a report, bypassing formula-based tools.
+- **Freelancer**: Manages client data in an .xls file, using the chat interface to summarize hours worked or revenue without manual calculations.
+- **Data Analyst**: Uploads a dataset to perform quick exploratory analysis (e.g., max/min values) and visualize trends, valuing simplicity and privacy.
+
+## Feature-Based Workflows
+
+Below are the core features of the app, each with a detailed workflow outlining how users interact with them.
+
+### 1. File Upload and Data Handling
+- **User Entry Point**: A prominent "Upload File" button or menu option on the app’s main screen.
+- **Step-by-Step Workflow**:
+  1. User clicks "Upload File."
+  2. A file dialog opens, prompting the user to select a local .csv or .xls file.
+  3. User selects the file and confirms (e.g., clicks "Open" or "Upload").
+  4. The app parses the file and displays the data in a spreadsheet view.
+- **Outcome**: The spreadsheet data is loaded and visible in the app, ready for further interaction.
+
+### 2. Basic Data Queries
+- **User Entry Point**: The chat interface, paired with optional data range selection in the spreadsheet view.
+- **Step-by-Step Workflow**:
+  1. User selects a data range in the spreadsheet (e.g., a column of sales figures) using a shortcut like Cmd + K or mouse selection.
+  2. User types a natural language query in the chat box (e.g., "What’s the average of this range?" or "Sum these values").
+  3. The app interprets the query, processes the calculation (e.g., average, sum, count, max/min).
+  4. The result is displayed in the chat interface and, if applicable, updates the spreadsheet view (e.g., adds a new cell with the result).
+- **Outcome**: The user receives an accurate calculation based on their query, presented in a clear and accessible format.
+
+### 3. Simple Visualizations
+- **User Entry Point**: The chat interface, with data selection in the spreadsheet view.
+- **Step-by-Step Workflow**:
+  1. User selects relevant data (e.g., two columns: product names and sales figures) using Cmd + K or mouse selection.
+  2. User types a command in the chat box (e.g., "Create a bar chart of sales by product" or "Show a line chart of these values").
+  3. The app processes the request and generates the requested chart (e.g., bar, line, or pie).
+  4. The chart is displayed within the spreadsheet view, below or alongside the data.
+- **Outcome**: A visual representation of the selected data is generated and embedded in the app for easy review.
+
+### 4. Chat Interface
+- **User Entry Point**: A persistent chat box, likely a side panel or bottom bar, always accessible alongside the spreadsheet view.
+- **Step-by-Step Workflow**:
+  1. User types a natural language query or command in the chat box (e.g., "What’s the max value here?" or "Generate a pie chart").
+  2. If required, user selects a data range before or after typing (e.g., using Cmd + K).
+  3. The app interprets the input, executes the corresponding action (e.g., calculation or visualization).
+  4. The response (e.g., result, chart, or clarification request) is displayed in the chat and/or spreadsheet view.
+- **Outcome**: The app facilitates seamless, conversational interaction with the data, responding to user inputs with actionable results.
+
+## End-to-End User Journey
+
+This section outlines a complete user flow from opening the app to exiting, including onboarding, core interactions, and error handling.
+
+1. **Onboarding**:
+   - User opens the app and lands on the main screen.
+   - If first-time user, a brief tutorial appears (e.g., "Upload a file here, then ask questions in the chat"), skippable via a "Skip" button.
+   - User clicks "Upload File," selects a .csv file with sales data, and confirms.
+   - The app parses the file and displays it in the spreadsheet view.
+
+2. **Core Feature Interactions**:
+   - User selects a column of sales figures using Cmd + K.
+   - User types in the chat: "What’s the average of this range?"
+   - The app calculates the average and displays it in the chat (e.g., "The average is $250").
+   - User then selects two columns (product names and sales figures).
+   - User types: "Create a bar chart of sales by product."
+   - The app generates a bar chart, embedding it below the spreadsheet data.
+   - User reviews the average and chart within the app.
+
+3. **Error or Exception Handling**:
+   - If the file upload fails (e.g., unsupported format), an error message appears: "Invalid file format. Please upload a .csv or .xls file," with a "Try Again" button.
+   - If a query is unclear (e.g., "What’s this?"), the chat responds: "Could you please clarify your request? For example, try ‘What’s the sum of this range?’" 
+   - If no data range is selected for a query requiring one, the app prompts: "Please select a range first."
+
+4. **Exit**:
+   - User finishes reviewing results and closes the app.
+   - If a save feature exists, the app prompts: "Save your session?" with options to save locally or discard changes. Otherwise, the session ends with data retained locally until the app is reopened.
+
+## Feature Interdependencies
+
+- **Chat Interface**: The central hub for user interaction, it depends on uploaded data and drives both data queries and visualizations.
+- **File Upload and Data Handling**: A prerequisite for all other features; no queries or visualizations can occur without a loaded spreadsheet.
+- **Basic Data Queries**: Relies on the chat interface for input and the spreadsheet view for data selection and result display.
+- **Simple Visualizations**: Depends on the chat interface for commands, the uploaded data for content, and the spreadsheet view for display.
+- **Critical Pathway**: The workflow follows a sequence: upload file → view data → interact via chat (queries or visualizations) → view results. Each step builds on the previous one.
+
+## Workflow Diagram (Optional)
+
+A high-level diagram is recommended to visualize the user flow:
+- **Start** → **Upload File** → **View Spreadsheet** → **Interact via Chat** (loop: **Select Range** → **Query/Command** → **View Result**) → **Exit**
+- Placeholder suggestion: Include arrows showing transitions and a loop for repeated chat interactions.
+
+## Assumptions and Open Questions
+
+### Assumptions
+- The app supports only .csv and .xls files for the MVP, with local parsing and no cloud dependency.
+- Natural language processing in the chat interface can interpret basic queries (e.g., "sum," "average," "chart") accurately for non-technical users.
+- Data range selection uses a shortcut like Cmd + K or mouse clicks, integrated with the spreadsheet view.
+- Visualizations are embedded in the spreadsheet view, not in separate windows or tabs.
+- Chat history is visible, allowing users to scroll through past queries and responses, though queries are independent for the MVP.
+
+### Open Questions
+- What is the maximum file size or query complexity supported in the MVP? Are there performance limits?
+- Are there specific natural language processing limitations (e.g., unsupported phrasing or languages)?
+- How does the app handle ambiguous or erroneous queries beyond basic clarification prompts?
+- Is there a mechanism to save sessions or export results (e.g., charts as images, calculations as files)?
+- Is the app strictly single-user for the MVP, or are there future plans for collaboration features?
+
+---
+
+This **App Workflow Document** provides a comprehensive guide to the workflows of the Chat-Based Spreadsheet Tool, ensuring that designers and developers can create a seamless, intuitive experience for non-technical users. It emphasizes simplicity, natural language interaction, and privacy, aligning with the app’s core purpose.

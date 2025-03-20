@@ -1,0 +1,139 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# AI Chatbot Development Document for Cognisheet
+
+## Introduction and Overview
+
+The AI chatbot for Cognisheet is designed to make spreadsheet analysis intuitive and powerful for non-technical users. By understanding user requests conversationally, the chatbot unlocks advanced capabilities without requiring formula expertise or manual data handling. The chatbot will:
+
+- Analyze spreadsheet data and generate visualizations powered by Python.
+- Create formulas based on user needs.
+- Produce charts and import them directly into the spreadsheet.
+- Research and scrape the web to pull external data into the spreadsheet.
+- Extract text and structured information from PDFs and images.
+
+This document provides a clear plan for developing these features, ensuring the chatbot is seamlessly integrated into the existing spreadsheet application.
+
+---
+
+## Functional Requirements
+
+The AI chatbot must support the following features:
+
+1. **Data Analysis and Visualization**  
+   - Read and analyze data in the current spreadsheet.  
+   - Generate Python-powered visualizations (e.g., graphs, plots) based on user requests.  
+   - Display visualizations directly within the spreadsheet interface.  
+
+2. **Formula Generation**  
+   - Understand user requests for calculations and generate appropriate spreadsheet formulas.  
+   - Insert the generated formulas into the spreadsheet for immediate use.  
+
+3. **Chart Generation**  
+   - Create charts (e.g., bar, line, pie) from spreadsheet data based on user commands.  
+   - Import the charts directly into the spreadsheet view.  
+
+4. **Web Research and Scraping**  
+   - Perform web searches and scrape data based on user queries (e.g., "Find Airbnbs near Disneyland California").  
+   - Use tools like `@firecrawl_dev` and `@ExaAILabs` for efficient and structured data retrieval.  
+   - Insert the scraped data into the spreadsheet in an organized format.  
+
+5. **Document Data Extraction**  
+   - Extract text and structured data (e.g., tables) from PDFs and images.  
+   - Import the extracted information into the spreadsheet for further use.  
+
+---
+
+## Development Approach
+
+Each feature requires a specific approach to ensure it is user-friendly, efficient, and integrated smoothly with the spreadsheet.
+
+### 1. Data Analysis and Visualization
+- Use a system to interpret user requests (e.g., "Show sales trends") and analyze the spreadsheet data.  
+- Enable Python-based tools to create visualizations like graphs or plots.  
+- Design a way to show these visualizations inside the spreadsheet, such as in a panel or pop-up.
+
+### 2. Formula Generation
+- Build the chatbot to recognize what calculations users want and turn them into spreadsheet formulas.  
+- Ensure the formulas are added to the right cells and work correctly, even with tricky data like empty cells.
+
+### 3. Chart Generation
+- Use the spreadsheet’s built-in charting tools or add simple charting options.  
+- Let the chatbot figure out what kind of chart and data to use from user requests (e.g., "Make a pie chart of expenses").  
+- Automate adding the charts to the spreadsheet.
+
+### 4. Web Research and Scraping
+- Connect the chatbot to web tools like `@firecrawl_dev` and `@ExaAILabs` to search and grab data.  
+- Turn user questions into search tasks and organize the results (e.g., Airbnb listings into rows and columns).  
+- Place the data neatly into the spreadsheet.
+
+### 5. Document Data Extraction
+- Add tools to read text and tables from PDFs and images quickly.  
+- Match the extracted data to spreadsheet cells or sections.  
+- Ask users for clarification if needed (e.g., "Which table do you want?").
+
+---
+
+## Integration with Spreadsheet App
+
+The AI chatbot will live inside the spreadsheet interface, likely as a sidebar or chat window, so users can access it without leaving their work.
+
+- **Connection**: Link the chatbot to the spreadsheet so it can read and change data as needed.  
+- **Instant Updates**: Make sure visualizations, charts, and data appear right away after a request.  
+- **Access**: Give the chatbot permission to work with the spreadsheet’s current data and layout.
+
+---
+
+## Roadmap for Implementation
+
+Assuming the base spreadsheet app is ready, here’s how to build and add the AI chatbot:
+
+### 3. Implement Data Analysis and Visualization
+- Add Python support to analyze data and create visualizations.  
+- Build a way to show these visualizations in the spreadsheet.
+
+### 4. Add Formula Generation
+- Teach the chatbot to make formulas from user requests.  
+- Add steps to check and place formulas in the spreadsheet.
+
+### 5. Integrate Chart Generation
+- Use or improve the spreadsheet’s charting features.  
+- Make the chatbot create and insert charts automatically.
+
+### 6. Enable Web Research and Scraping
+- Link the chatbot to `@firecrawl_dev` and `@ExaAILabs` for web tasks.  
+- Create a system to organize and add scraped data to the spreadsheet.
+
+### 7. Implement Document Data Extraction
+- Add tools to pull text and tables from PDFs and images.  
+- Set up a way to move this data into the spreadsheet.
+
+### 8. Testing and Iteration
+- Test each feature on its own and with the spreadsheet.  
+- Try it with real users to see if it’s easy to use and works well.  
+- Fix any issues and improve based on feedback.
+
+---
+
+## Testing and Validation
+
+To make sure the AI chatbot works perfectly, follow these testing steps:
+
+- **Feature Testing**: Check each part (like formulas or data extraction) works correctly.  
+- **App Testing**: Ensure the chatbot fits into the spreadsheet without problems.  
+- **User Testing**: Let users try it and confirm it meets their needs.  
+- **Speed Testing**: Make sure it runs smoothly, even with big data or complex tasks.
+
+---
+
+## Conclusion
+
+This document lays out a straightforward plan to build the AI chatbot for Cognisheet. By following the features, approach, and roadmap, the team can create a tool that makes spreadsheets smarter and easier to use. Start by setting up the environment and building the chatbot’s core, then add each feature step-by-step, testing along the way to ensure it’s ready for users.
+
+--- 
+
+This is everything you need to develop the AI chatbot, tailored to your vision for Cognisheet!

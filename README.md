@@ -6,10 +6,11 @@ Cognisheet is a user-friendly spreadsheet tool with a chat interface for natural
 
 - **File Upload**: Import CSV and Excel files with ease
 - **Natural Language Queries**: Ask questions about your data in plain English
+- **AI-Powered Analysis**: Use OpenAI to analyze your data and get insights
 - **Data Selection**: Select ranges of data for analysis
 - **Calculations**: Perform calculations like sum, average, max, min, and count
 - **Visualizations**: Generate bar, line, and pie charts from your data
-- **Local Processing**: All data stays on your computer for privacy
+- **Local Processing**: Option to process data locally for privacy
 
 ## Getting Started
 
@@ -17,6 +18,7 @@ Cognisheet is a user-friendly spreadsheet tool with a chat interface for natural
 
 - Node.js (v18.x or later)
 - npm (v8.x or later)
+- OpenAI API key (for AI features)
 
 ### Installation
 
@@ -30,6 +32,11 @@ Cognisheet is a user-friendly spreadsheet tool with a chat interface for natural
    ```
    npm install
    ```
+
+3. Set up your OpenAI API key:
+   - Create a `.env` file in the root directory
+   - Add your OpenAI API key: `VITE_OPENAI_API_KEY=your_openai_api_key_here`
+   - You can get an API key from [OpenAI's platform](https://platform.openai.com/api-keys)
 
 ### Running the Application
 
@@ -86,6 +93,12 @@ This will create executable files for your platform in the `dist` directory.
    - "What's the average of this range?"
    - "Create a bar chart of these values"
    - "What's the maximum value in column A?"
+   - With AI enabled: "Analyze this data and tell me trends"
+   - With AI enabled: "Summarize what this spreadsheet contains"
+
+4. **Toggle AI Mode**: Use the AI toggle in the chat panel to switch between:
+   - AI mode (uses OpenAI for advanced analysis)
+   - Local mode (processes queries locally for privacy)
 
 ## Technology Stack
 
@@ -93,7 +106,7 @@ This will create executable files for your platform in the `dist` directory.
 - **Backend**: Node.js, Express
 - **Desktop App**: Electron
 - **Data Processing**: PapaParse (CSV), XLSX (Excel)
-- **Natural Language Processing**: Compromise
+- **Natural Language Processing**: Compromise, OpenAI
 - **Visualization**: Chart.js
 
 ## License

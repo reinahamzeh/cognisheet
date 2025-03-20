@@ -16,20 +16,38 @@ export const GlobalStyles = createGlobalStyle`
     background-color: ${({ theme }) => theme.colors.background};
   }
 
+  #root {
+    height: 100%;
+  }
+
   button, input, textarea, select {
     font-family: inherit;
     font-size: inherit;
     color: inherit;
+    background-color: ${({ theme }) => theme.colors.white};
+    border: 1px solid ${({ theme }) => theme.colors.lightGray};
+  }
+
+  input, textarea, select {
+    padding: 8px 12px;
+    border-radius: 4px;
   }
 
   button {
     cursor: pointer;
     border: none;
-    background: none;
+    background: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.white};
+    padding: 8px 16px;
+    border-radius: 4px;
     
     &:disabled {
       cursor: not-allowed;
-      opacity: 0.7;
+      opacity: 0.5;
+    }
+
+    &:hover:not(:disabled) {
+      background: ${({ theme }) => theme.colors.accent};
     }
   }
 
@@ -38,7 +56,7 @@ export const GlobalStyles = createGlobalStyle`
     text-decoration: none;
     
     &:hover {
-      text-decoration: underline;
+      opacity: 0.8;
     }
   }
 
@@ -50,8 +68,8 @@ export const GlobalStyles = createGlobalStyle`
 
   /* For scrollbars */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
 
   ::-webkit-scrollbar-track {
@@ -59,11 +77,11 @@ export const GlobalStyles = createGlobalStyle`
   }
 
   ::-webkit-scrollbar-thumb {
-    background: ${({ theme }) => theme.colors.darkGray};
-    border-radius: 4px;
+    background: ${({ theme }) => theme.colors.primary};
+    border-radius: 3px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: ${({ theme }) => theme.colors.primary};
+    background: ${({ theme }) => theme.colors.accent};
   }
 `; 

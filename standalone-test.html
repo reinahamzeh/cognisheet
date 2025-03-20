@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cognisheet File Upload Test</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .header {
+      background-color: #fff;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      margin: 0;
+      color: #333;
+    }
+    .upload-container {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .button {
+      background-color: #1e2c54;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    .file-info {
+      margin-top: 10px;
+      color: #555;
+    }
+    .spreadsheet-container {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      overflow: auto;
+      max-height: 600px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #f1f1f1;
+      position: sticky;
+      top: 0;
+    }
+    td {
+      font-size: 14px;
+    }
+    tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+    .editable:focus {
+      outline: 2px solid #4a90e2;
+      background-color: #e6f7ff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Cognisheet File Upload Test</h1>
+    </div>
+    
+    <div class="upload-container">
+      <input type="file" id="fileInput" accept=".csv,.xls,.xlsx" style="display: none;" />
+      <button class="button" id="uploadButton">Upload File</button>
+      <div class="file-info" id="fileInfo"></div>
+    </div>
+    
+    <div class="spreadsheet-container" id="spreadsheetContainer">
+      <!-- Spreadsheet will be rendered here -->
+    </div>
+  </div>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const fileInput = document.getElementById('fileInput');
+      const uploadButton = document.getElementById('uploadButton');
+      const fileInfo = document.getElementById('fileInfo');
+      const spreadsheetContainer = document.getElementById('spreadsheetContainer');
+      
+      let spreadsheetData = [];
+      
+      uploadButton.addEventListener('click', function() {
+        fileInput.click();
+      });
+      
+      fileInput.addEventListener('change', function(event) {
+        console.log('File input change event triggered');
+        
+        const files = event.target.files;
+        if (!files || files.length === 0) {
+          console.error('No files selected');
+          return;
+        }
+        
+        const file = files[0];
+        console.log('Selected file:', file.name, 'size:', file.size, 'type:', file.type);
+        
+        fileInfo.textContent = `File: ${file.name} (${formatFileSize(file.size)})`;
+        
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+          console.log('File read complete');
+          const content = e.target.result;
+          
+          if (!content) {
+            console.error('No content read from file');
+            return;
+          }
+          
+          const fileExt = file.name.split('.').pop().toLowerCase();
+          console.log('File extension detected:', fileExt);
+          
+          if (fileExt === 'csv') {
+            parseCSV(content);
+          } else if (['xls', 'xlsx'].includes(fileExt)) {
+            parseExcel(content);
+          } else {
+            console.error('Unsupported file type:', fileExt);
+          }
+        };
+        
+        reader.onerror = function(error) {
+          console.error('Error reading file:', error);
+          fileInfo.textContent = 'Error reading file';
+        };
+        
+        console.log('Starting file read...');
+        if (file.name.endsWith('.csv')) {
+          reader.readAsText(file);
+        } else {
+          reader.readAsArrayBuffer(file);
+        }
+        
+        // Reset the input value to allow selecting the same file again
+        event.target.value = '';
+      });
+      
+      function parseCSV(content) {
+        console.log('Parsing CSV with content length:', content.length);
+        
+        Papa.parse(content, {
+          complete: function(results) {
+            console.log('CSV parsing complete, rows:', results.data.length);
+            
+            if (results.data && results.data.length > 0) {
+              // Use the data directly as a 2D array
+              spreadsheetData = results.data;
+              console.log('Grid created with size:', spreadsheetData.length, 'x', spreadsheetData[0].length);
+              
+              renderSpreadsheet(spreadsheetData);
+            } else {
+              console.error('No data found in the CSV file');
+              fileInfo.textContent = 'No data found in the CSV file';
+            }
+          },
+          error: function(error) {
+            console.error('Error parsing CSV:', error);
+            fileInfo.textContent = 'Error parsing CSV file';
+          }
+        });
+      }
+      
+      function parseExcel(content) {
+        console.log('Parsing Excel file with buffer size:', content.byteLength);
+        
+        try {
+          const data = new Uint8Array(content);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheet];
+          
+          // Convert to array format directly
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          
+          console.log('Excel parsing complete, rows:', jsonData.length);
+          
+          if (jsonData && jsonData.length > 0) {
+            // Convert all values to strings
+            spreadsheetData = jsonData.map(row => 
+              row.map(cell => cell !== undefined && cell !== null ? String(cell) : '')
+            );
+            
+            console.log('Grid created with size:', spreadsheetData.length, 'x', spreadsheetData[0].length);
+            
+            renderSpreadsheet(spreadsheetData);
+          } else {
+            console.error('No data found in the Excel file');
+            fileInfo.textContent = 'No data found in the Excel file';
+          }
+        } catch (err) {
+          console.error('Error parsing Excel:', err);
+          fileInfo.textContent = 'Error parsing Excel file';
+        }
+      }
+      
+      function renderSpreadsheet(data) {
+        // Clear the container
+        spreadsheetContainer.innerHTML = '';
+        
+        // Create table
+        const table = document.createElement('table');
+        
+        // Create header row if data exists
+        if (data && data.length > 0) {
+          const thead = document.createElement('thead');
+          const headerRow = document.createElement('tr');
+          
+          // Add column index header (empty cell)
+          const indexHeader = document.createElement('th');
+          headerRow.appendChild(indexHeader);
+          
+          // Add column headers
+          data[0].forEach((_, index) => {
+            const th = document.createElement('th');
+            th.textContent = getColumnLetter(index);
+            headerRow.appendChild(th);
+          });
+          
+          thead.appendChild(headerRow);
+          table.appendChild(thead);
+          
+          // Create table body
+          const tbody = document.createElement('tbody');
+          
+          // Add data rows
+          data.forEach((row, rowIndex) => {
+            const tr = document.createElement('tr');
+            
+            // Add row index
+            const rowIndexCell = document.createElement('td');
+            rowIndexCell.textContent = (rowIndex + 1).toString();
+            rowIndexCell.style.backgroundColor = '#f1f1f1';
+            rowIndexCell.style.fontWeight = 'bold';
+            tr.appendChild(rowIndexCell);
+            
+            // Add cells
+            row.forEach((cell, cellIndex) => {
+              const td = document.createElement('td');
+              td.textContent = cell;
+              td.className = 'editable';
+              td.contentEditable = 'true';
+              td.dataset.row = rowIndex;
+              td.dataset.col = cellIndex;
+              
+              // Add event listener for editing
+              td.addEventListener('blur', function() {
+                const newValue = this.textContent;
+                const row = parseInt(this.dataset.row);
+                const col = parseInt(this.dataset.col);
+                
+                // Update the data
+                if (spreadsheetData[row] && spreadsheetData[row][col] !== undefined) {
+                  spreadsheetData[row][col] = newValue;
+                  console.log(`Cell (${row},${col}) updated to: ${newValue}`);
+                }
+              });
+              
+              tr.appendChild(td);
+            });
+            
+            tbody.appendChild(tr);
+          });
+          
+          table.appendChild(tbody);
+        }
+        
+        spreadsheetContainer.appendChild(table);
+      }
+      
+      function getColumnLetter(index) {
+        let columnName = '';
+        while (index >= 0) {
+          columnName = String.fromCharCode(65 + (index % 26)) + columnName;
+          index = Math.floor(index / 26) - 1;
+        }
+        return columnName;
+      }
+      
+      function formatFileSize(bytes) {
+        const kilobyte = 1024;
+        const megabyte = kilobyte * 1024;
+        
+        if (bytes < kilobyte) {
+          return bytes + ' B';
+        } else if (bytes < megabyte) {
+          return (bytes / kilobyte).toFixed(2) + ' KB';
+        } else {
+          return (bytes / megabyte).toFixed(2) + ' MB';
+        }
+      }
+    });
+  </script>
+</body>
+</html> 

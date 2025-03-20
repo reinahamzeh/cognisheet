@@ -9,7 +9,7 @@ const OnboardingContainer = styled.div`
   justify-content: center;
   height: 100%;
   padding: ${({ theme }) => theme.spacing.large};
-  background-color: ${({ theme }) => theme.colors.white};
+  background-color: ${({ theme }) => theme.colors.background};
   text-align: center;
 `;
 
@@ -22,6 +22,7 @@ const Title = styled.h1`
 const Description = styled.p`
   font-size: ${({ theme }) => theme.fontSizes.body};
   color: ${({ theme }) => theme.colors.text};
+  opacity: 0.8;
   max-width: 600px;
   margin-bottom: ${({ theme }) => theme.spacing.large};
   line-height: 1.6;
@@ -60,10 +61,12 @@ const StepContent = styled.div`
   h3 {
     font-size: ${({ theme }) => theme.fontSizes.h2};
     margin-bottom: ${({ theme }) => theme.spacing.small};
+    color: ${({ theme }) => theme.colors.primary};
   }
   
   p {
-    color: ${({ theme }) => theme.colors.darkGray};
+    color: ${({ theme }) => theme.colors.text};
+    opacity: 0.7;
   }
 `;
 
@@ -76,15 +79,14 @@ const Button = styled.button`
   padding: ${({ theme }) => `${theme.spacing.small} ${theme.spacing.medium}`};
   background-color: ${({ theme, primary }) => primary ? theme.colors.primary : 'transparent'};
   color: ${({ theme, primary }) => primary ? theme.colors.white : theme.colors.text};
-  border: 1px solid ${({ theme, primary }) => primary ? theme.colors.primary : theme.colors.lightGray};
+  border: 1px solid ${({ theme, primary }) => primary ? 'transparent' : theme.colors.lightGray};
   border-radius: ${({ theme }) => theme.borderRadius.small};
   font-weight: 500;
   cursor: pointer;
   transition: all ${({ theme }) => theme.transitions.fast};
   
   &:hover {
-    background-color: ${({ theme, primary }) => primary ? theme.colors.primary : theme.colors.lightGray};
-    opacity: 0.9;
+    background-color: ${({ theme, primary }) => primary ? theme.colors.accent : theme.colors.lightGray};
   }
 `;
 
@@ -109,7 +111,7 @@ const Onboarding = ({ isFirstTime, onComplete, onSkip }) => {
           <StepNumber>1</StepNumber>
           <StepContent>
             <h3>Upload a Spreadsheet</h3>
-            <p>Start by uploading a CSV or Excel file with your data.</p>
+            <p>Start by uploading a CSV, Excel, or Numbers file with your data.</p>
           </StepContent>
         </Step>
         

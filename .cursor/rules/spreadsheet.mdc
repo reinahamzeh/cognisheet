@@ -1,0 +1,65 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+### Essential Features of a Spreadsheet Viewer
+
+1. **Spreadsheet View**
+   - Displays a grid of cells organized into rows and columns, typically labeled with letters (columns) and numbers (rows).
+   - Allows smooth scrolling through large datasets.
+   - Enables selection of individual cells, ranges (e.g., A1:B10), or entire rows and columns for editing or formatting.
+
+2. **Formulas in Cells (Making)**
+   - Lets users create and edit formulas in cells to perform calculations (e.g., `=A1+B1` or `=SUM(A1:A10)`).
+   - Supports a variety of built-in functions, including:
+     - **Arithmetic**: SUM, AVERAGE, PRODUCT
+     - **Statistical**: MIN, MAX, COUNT
+     - **Financial**: PMT, FV
+     - **Logical**: IF, AND, OR
+   - Includes a formula bar to view and modify the formula of the selected cell.
+   - Automatically calculates and updates results when input data changes.
+
+3. **Data Formatting**
+   - Offers options to format cell contents, such as:
+     - Numbers (e.g., decimals, thousands separators)
+     - Dates (e.g., MM/DD/YYYY)
+     - Currencies (e.g., $100.00)
+     - Percentages (e.g., 75%)
+     - Text styles (e.g., bold, italic, font size)
+   - Allows customization of cell appearance with borders, colors, and shading.
+
+4. **Data Validation**
+   - Restricts data entry to specific types or values (e.g., whole numbers, dates, or a dropdown list).
+   - Provides error alerts if invalid data is entered.
+   - Enhances data integrity for consistent input.
+
+5. **Sorting and Filtering**
+   - Sorts data in ascending or descending order based on one or more columns.
+   - Filters data to show only rows matching specific criteria (e.g., values greater than 50).
+   - Simplifies navigation and analysis of large datasets.
+
+6. **Charts and Graphs**
+   - Creates visual representations of data, such as:
+     - Bar charts
+     - Line graphs
+     - Pie charts
+     - Scatter plots
+   - Includes customization options for titles, legends, and colors.
+   - Helps users interpret data trends quickly.
+
+7. **Export Capabilities**
+   - Exports spreadsheets to formats such as PDF, CSV, or Excel files.
+   - Ensures compatibility with other tools and systems.
+
+
+10. **User Interface Enhancements**
+    - Provides **undo/redo** to reverse or repeat actions.
+    - Includes **find/replace** to search and edit data efficiently.
+    - Offers **keyboard shortcuts** (e.g., Ctrl+C for copy) for faster navigation.
+
+---
+
+### Conclusion
+
+These features make a spreadsheet viewer like Excel a powerful tool for both basic tasks (e.g., organizing data) and advanced needs (e.g., data analysis or automation). Starting with your essentials—**spreadsheet view** and **formulas in cells**—this list builds a complete picture of what users expect from such an application. Whether for personal use, business, or collaboration, these capabilities ensure flexibility and efficiency.

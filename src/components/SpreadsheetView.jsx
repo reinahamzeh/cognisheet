@@ -8,6 +8,7 @@ const SpreadsheetContainer = styled.div`
   height: 100%;
   background-color: ${({ theme }) => theme.colors.white};
   border-radius: ${({ theme }) => theme.borderRadius.medium};
+  border: 1px solid ${({ theme }) => theme.colors.lightGray};
   box-shadow: ${({ theme }) => theme.shadows.small};
   overflow: hidden;
 `;
@@ -24,11 +25,12 @@ const EmptyState = styled.div`
   h2 {
     font-size: ${({ theme }) => theme.fontSizes.h2};
     margin-bottom: ${({ theme }) => theme.spacing.base};
-    color: ${({ theme }) => theme.colors.darkGray};
+    color: ${({ theme }) => theme.colors.primary};
   }
   
   p {
-    color: ${({ theme }) => theme.colors.darkGray};
+    color: ${({ theme }) => theme.colors.text};
+    opacity: 0.7;
     margin-bottom: ${({ theme }) => theme.spacing.medium};
   }
   
@@ -41,8 +43,8 @@ const EmptyState = styled.div`
     cursor: pointer;
     transition: all ${({ theme }) => theme.transitions.fast};
     
-    &:hover {
-      opacity: 0.9;
+    &:hover:not(:disabled) {
+      background-color: ${({ theme }) => theme.colors.accent};
     }
   }
 `;
@@ -69,7 +71,7 @@ const Row = styled.div`
   border-bottom: 1px solid ${({ theme }) => theme.colors.lightGray};
   
   &:nth-child(even) {
-    background-color: ${({ theme }) => theme.colors.background};
+    background-color: ${({ theme }) => theme.colors.lightGray};
   }
   
   &.selected {
@@ -85,9 +87,10 @@ const Cell = styled.div`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: ${({ theme }) => theme.colors.text};
   
   &.selected {
-    background-color: ${({ theme }) => theme.colors.primary}40;
+    background-color: ${({ theme }) => theme.colors.primary}20;
   }
   
   &:last-child {
@@ -103,8 +106,39 @@ const ErrorMessage = styled.div`
   margin: ${({ theme }) => theme.spacing.base};
 `;
 
+const LoadingIndicator = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: ${({ theme }) => theme.spacing.large};
+  text-align: center;
+  
+  h2 {
+    font-size: ${({ theme }) => theme.fontSizes.h2};
+    margin-bottom: ${({ theme }) => theme.spacing.base};
+    color: ${({ theme }) => theme.colors.primary};
+  }
+  
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid ${({ theme }) => theme.colors.lightGray};
+    border-top: 4px solid ${({ theme }) => theme.colors.primary};
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: ${({ theme }) => theme.spacing.base};
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+
 const SpreadsheetView = () => {
-  const { headers, rows, error, handleFileUpload, handleCellSelection, selectedRange } = useSpreadsheet();
+  const { headers, rows, error, loading, handleFileUpload, handleCellSelection, selectedRange } = useSpreadsheet();
   const [selectionStart, setSelectionStart] = useState(null);
   const [selectionEnd, setSelectionEnd] = useState(null);
   const [isSelecting, setIsSelecting] = useState(false);
@@ -164,6 +198,18 @@ const SpreadsheetView = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [rows, headers, handleCellSelection]);
+  
+  // If loading
+  if (loading) {
+    return (
+      <SpreadsheetContainer>
+        <LoadingIndicator>
+          <div className="spinner"></div>
+          <h2>Loading spreadsheet data...</h2>
+        </LoadingIndicator>
+      </SpreadsheetContainer>
+    );
+  }
   
   // If no data is loaded yet
   if (!rows || rows.length === 0) {

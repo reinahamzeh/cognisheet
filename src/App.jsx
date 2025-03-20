@@ -1,107 +1,66 @@
-import React, { useState, useEffect } from 'react';
-import styled from 'styled-components';
-import Header from './components/Header';
-import SpreadsheetView from './components/SpreadsheetView';
-import ChatPanel from './components/ChatPanel';
-import LandingPage from './components/LandingPage';
+import React from 'react';
+import { Routes, Route } from 'react-router-dom';
 import { SpreadsheetProvider } from './context/SpreadsheetContext';
 import { ChatProvider } from './context/ChatContext';
-import Onboarding from './components/Onboarding';
-import { io } from 'socket.io-client';
+import { ChatHistoryProvider } from './context/ChatHistoryContext';
+import { EnhancedSpreadsheetApp } from './components/EnhancedSpreadsheetApp';
+import LandingPage from './components/LandingPage';
+import SpreadsheetView from './components/SpreadsheetView';
+import ChatPanel from './components/ChatPanel';
+import Header from './components/Header';
+import NewChatInterface from './components/NewChatInterface';
 
-const AppContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  background-color: ${({ theme }) => theme.colors.background};
-  color: ${({ theme }) => theme.colors.text};
-  font-family: 'Roboto', sans-serif;
-`;
-
-const MainContent = styled.main`
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-`;
-
-const SpreadsheetContainer = styled.div`
-  flex: 1;
-  overflow: auto;
-  padding: ${({ theme }) => theme.spacing.base};
-`;
-
-function App() {
-  const [isFirstTime, setIsFirstTime] = useState(true);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [serverConnected, setServerConnected] = useState(false);
-  const [dataLoaded, setDataLoaded] = useState(false);
-
-  // Check server connectivity
-  useEffect(() => {
-    const socket = io('http://localhost:4000', {
-      timeout: 5000,
-      reconnectionAttempts: 3
-    });
-
-    socket.on('connect', () => {
-      console.log('Connected to server');
-      setServerConnected(true);
-    });
-
-    socket.on('connect_error', () => {
-      console.log('Failed to connect to server');
-      setServerConnected(false);
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, []);
-
-  useEffect(() => {
-    // Check if user has used the app before
-    const hasUsedBefore = localStorage.getItem('hasUsedCognisheet');
-    if (hasUsedBefore) {
-      setIsFirstTime(false);
-    }
-  }, []);
-
-  const completeOnboarding = () => {
-    localStorage.setItem('hasUsedCognisheet', 'true');
-    setShowOnboarding(false);
-  };
-
-  // This function will be called when data is loaded
-  const handleDataLoaded = () => {
-    setDataLoaded(true);
-  };
-
+// Main layout with spreadsheet and chat panel side by side
+const MainLayout = () => {
   return (
-    <SpreadsheetProvider onDataLoaded={handleDataLoaded}>
+    <div className="app-container">
+      <Header />
+      <div className="main-content">
+        <SpreadsheetView />
+        <ChatPanel />
+      </div>
+    </div>
+  );
+};
+
+// Enhanced layout with EnhancedSpreadsheetApp
+const EnhancedLayout = () => {
+  return (
+    <div className="app-container">
+      <Header />
+      <EnhancedSpreadsheetApp />
+    </div>
+  );
+};
+
+// New chat interface layout
+const NewChatLayout = () => {
+  return (
+    <div className="app-container">
+      <Header />
+      <div className="main-content">
+        <SpreadsheetView />
+        <NewChatInterface />
+      </div>
+    </div>
+  );
+};
+
+const App = () => {
+  return (
+    <SpreadsheetProvider>
       <ChatProvider>
-        <AppContainer>
-          <Header />
-          
-          {showOnboarding ? (
-            <Onboarding 
-              isFirstTime={isFirstTime} 
-              onComplete={completeOnboarding} 
-              onSkip={completeOnboarding} 
-            />
-          ) : !dataLoaded ? (
-            <LandingPage serverConnected={serverConnected} />
-          ) : (
-            <MainContent>
-              <SpreadsheetContainer>
-                <SpreadsheetView />
-              </SpreadsheetContainer>
-              <ChatPanel />
-            </MainContent>
-          )}
-        </AppContainer>
+        <ChatHistoryProvider>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/app" element={<MainLayout />} />
+            <Route path="/enhanced" element={<EnhancedLayout />} />
+            <Route path="/new-chat" element={<NewChatLayout />} />
+          </Routes>
+        </ChatHistoryProvider>
       </ChatProvider>
     </SpreadsheetProvider>
   );
-}
+};
 
 export default App; 
