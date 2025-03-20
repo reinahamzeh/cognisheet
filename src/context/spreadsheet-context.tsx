@@ -1,12 +1,13 @@
 "use client";
 
 import React, { createContext, useContext, useState } from "react";
+import { useToast } from "@/components/ui/use-toast";
 
 interface SpreadsheetContextType {
   data: any[][] | null;
   fileName: string | null;
   loading: boolean;
-  handleFileUpload: () => Promise<void>;
+  handleFileUpload: (file: File) => Promise<void>;
   setData: (data: any[][], fileName: string) => void;
 }
 
@@ -22,16 +23,41 @@ export function SpreadsheetProvider({
   const [data, setSpreadsheetData] = useState<any[][] | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
 
-  const handleFileUpload = async () => {
+  const handleFileUpload = async (file: File) => {
     setLoading(true);
+
     try {
-      // File upload logic here
-      // For now, just simulate a delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setLoading(false);
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to upload file");
+      }
+
+      const data = await response.json();
+      setSpreadsheetData(data.content);
+      setFileName(file.name);
+
+      toast({
+        title: "Success",
+        description: "File uploaded successfully",
+        variant: "default",
+      });
     } catch (error) {
       console.error("Error uploading file:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to upload file",
+        variant: "destructive",
+      });
+    } finally {
       setLoading(false);
     }
   };
