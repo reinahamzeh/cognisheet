@@ -1,9 +1,14 @@
+'use client';
+
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import LandingPage from './components/LandingPage';
-import SpreadsheetView from './components/SpreadsheetView';
+import dynamic from 'next/dynamic';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
+
+// Dynamic imports for components
+const LandingPage = dynamic(() => import('./components/LandingPage'), { ssr: false });
+const SpreadsheetView = dynamic(() => import('./components/SpreadsheetView'), { ssr: false });
 
 const AppContainer = styled.div`
   display: flex;
