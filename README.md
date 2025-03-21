@@ -1,4 +1,4 @@
-# Cognisheet
+npm # Cognisheet
 
 Cognisheet is a user-friendly spreadsheet tool with a chat interface for natural language queries. It allows users to upload spreadsheet files (CSV, Excel) and interact with their data using simple, natural language commands.
 
