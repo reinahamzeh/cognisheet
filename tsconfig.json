@@ -23,10 +23,10 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
     /* Paths */
-    "baseUrl": ".",
+    "baseUrl": "app",
     "paths": {
       "@/*": [
-        "./*"
+        ".//*"
       ]
     },
     "incremental": true,
