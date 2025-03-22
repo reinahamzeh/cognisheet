@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import styled from 'styled-components';
 import { useSpreadsheet } from '../context/SpreadsheetContext';
 import { useUser } from '../context/UserContext';
-import Auth from './Auth';
+import Auth from './auth';
 import SavedSpreadsheets from './SavedSpreadsheets';
 import { getSpreadsheetById } from '../services/supabase';
 

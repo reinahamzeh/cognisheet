@@ -6,6 +6,7 @@ module.exports = {
     "./components/**/*.{ts,tsx}",
     "./app/**/*.{ts,tsx}",
     "./src/**/*.{ts,tsx}",
+    "*.{js,ts,jsx,tsx,mdx}",
   ],
   prefix: "",
   theme: {
@@ -59,12 +60,12 @@ module.exports = {
       },
       keyframes: {
         "accordion-down": {
-          from: { height: 0 },
+          from: { height: "0" },
           to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
           from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: 0 },
+          to: { height: "0" },
         },
         "slide-in-from-top-full": {
           '0%': { transform: 'translateY(-100%)' },

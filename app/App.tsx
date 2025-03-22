@@ -5,6 +5,9 @@ import styled from 'styled-components';
 import dynamic from 'next/dynamic';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
+import FileLimitModal from '../components/file-limit-modal';
+import PricingModal from '../components/pricing-modal';
+import { useUser } from '../lib/context/user-context';
 
 // Dynamic imports for components
 const LandingPage = dynamic(() => import('./components/LandingPage'), { ssr: false });
@@ -21,6 +24,11 @@ const App: React.FC = () => {
   const [view, setView] = useState<'landing' | 'spreadsheet'>('landing');
   const [spreadsheetData, setSpreadsheetData] = useState<string[][]>([]);
   const [fileName, setFileName] = useState<string>('');
+  
+  // Subscription related state
+  const [showFileLimitModal, setShowFileLimitModal] = useState(false);
+  const [showPricingModal, setShowPricingModal] = useState(false);
+  const { canCreateNewFile, incrementFileCount, isAuthenticated } = useUser();
 
   const parseCSV = (content: string) => {
     console.log('Parsing CSV with content length:', content.length);
@@ -88,8 +96,24 @@ const App: React.FC = () => {
   };
 
   const handleFileUpload = (file: File) => {
+    // Check if user is authenticated and can create a new file
+    if (!isAuthenticated) {
+      // If not authenticated, show pricing modal which will have a sign-in option
+      setShowPricingModal(true);
+      return;
+    }
+    
+    // If user is authenticated but reached file limit
+    if (!canCreateNewFile) {
+      setShowFileLimitModal(true);
+      return;
+    }
+    
     console.log('File upload started:', file.name, 'size:', file.size, 'type:', file.type);
     setFileName(file.name);
+    
+    // Increment the file count in the user context
+    incrementFileCount();
     
     const reader = new FileReader();
     
@@ -127,16 +151,28 @@ const App: React.FC = () => {
   };
 
   const handleNewFile = () => {
+    // Check if user is authenticated and can create a new file
+    if (!isAuthenticated) {
+      // If not authenticated, show pricing modal which will have a sign-in option
+      setShowPricingModal(true);
+      return;
+    }
+    
+    // If user is authenticated but reached file limit
+    if (!canCreateNewFile) {
+      setShowFileLimitModal(true);
+      return;
+    }
+    
     console.log('Creating new file');
+    
+    // Increment the file count in the user context
+    incrementFileCount();
+    
+    // Create an empty grid 10x10
+    const emptyGrid = Array(10).fill(0).map(() => Array(10).fill(''));
+    setSpreadsheetData(emptyGrid);
     setFileName('New Spreadsheet');
-    
-    // Create an empty spreadsheet with standard headers
-    const emptyData = [
-      ['', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'],
-      ...Array(20).fill(['', ...Array(26).fill('')])
-    ];
-    
-    setSpreadsheetData(emptyData);
     setView('spreadsheet');
   };
 
@@ -165,6 +201,21 @@ const App: React.FC = () => {
           onDataChange={handleSpreadsheetDataChange}
         />
       )}
+      
+      {/* Subscription-related modals */}
+      <FileLimitModal 
+        isOpen={showFileLimitModal} 
+        onClose={() => setShowFileLimitModal(false)} 
+        onUpgrade={() => {
+          setShowFileLimitModal(false);
+          setShowPricingModal(true);
+        }} 
+      />
+      
+      <PricingModal 
+        isOpen={showPricingModal} 
+        onClose={() => setShowPricingModal(false)} 
+      />
     </AppContainer>
   );
 };
