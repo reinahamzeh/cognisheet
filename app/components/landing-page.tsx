@@ -41,7 +41,7 @@ export function LandingPage() {
 
       <Button
         size="lg"
-        onClick={handleFileUpload}
+        onClick={() => handleFileUpload(new File([], "test.csv"))}
         disabled={loading}
         className="mb-8"
       >
@@ -60,7 +60,7 @@ export function LandingPage() {
                 <TabsContent value="upload">
                   <Button
                     size="lg"
-                    onClick={handleFileUpload}
+                    onClick={() => handleFileUpload(new File([], "test.csv"))}
                     disabled={loading}
                     className="w-full"
                   >
