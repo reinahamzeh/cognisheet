@@ -15,7 +15,10 @@
     "package": "electron-builder",
     "test": "jest",
     "lint": "next lint",
-    "apply-schema": "node --experimental-modules src/lib/applySchema.js"
+    "apply-schema": "node --experimental-modules src/lib/applySchema.js",
+    "db:init": "node lib/init-db.js",
+    "db:seed": "node lib/seed-db-cli.js",
+    "db:setup": "npm run db:init && npm run db:seed"
   },
   "keywords": [
     "spreadsheet",
