@@ -11,6 +11,7 @@ import PricingModal from "../components/pricing-modal"
 import Footer from "../components/footer"
 import { useClerk } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
+import KeyboardShortcutsHandler from '../components/KeyboardShortcutsHandler'
 
 export default function Home() {
   const [showPricingModal, setShowPricingModal] = useState(false)
@@ -23,6 +24,7 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <KeyboardShortcutsHandler />
       <Navbar />
 
       {/* Hero Section */}

@@ -1,11 +1,13 @@
 "use client"
 
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from "react"
 import * as XLSX from "xlsx"
 import Papa from "papaparse"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Bold, Italic, Download, Upload } from "lucide-react"
+import { useRecoilState } from "recoil"
+import { selectedCellRangeState, isChatFocusedState, cmdKTriggeredState } from "../atoms/spreadsheetAtoms"
 
 // Define FormatFunctions interface
 interface FormatFunctions {
@@ -481,69 +483,84 @@ export default function SpreadsheetComponent({
     setFormulaValue(newValue) // Keep formula bar in sync with cell edit
   }
 
-  // Handle cell click
-  const handleCellClick = (cellId: string, forceEdit = false) => {
-    // Clear selection
-    setSelectedCells([cellId])
+  // Add Recoil state for selected cell range
+  const [recoilSelectedCellRange, setRecoilSelectedCellRange] = useRecoilState(selectedCellRangeState);
+  const [isChatFocused] = useRecoilState(isChatFocusedState);
+  const [cmdKTriggered, setCmdKTriggered] = useRecoilState(cmdKTriggeredState);
+  
+  // Function to convert cell range to string reference for chat
+  const updateSelectedCellRangeForChat = useCallback(() => {
+    // Only update the cell range in Recoil state AFTER Cmd+K is pressed,
+    // not automatically when cells are selected
+    if (!selectedCells || selectedCells.length === 0) return;
     
-    // If clicking on already active cell and not in edit mode, enter edit mode
-    if (activeCell === cellId && !isEditing) {
-      setIsEditing(true)
-      // Focus the cell input immediately
+    let rangeString = "";
+    if (selectedCells.length === 1) {
+      // Single cell selection - just use the cell ID directly
+      rangeString = selectedCells[0];
+    } else {
+      // Range selection - use first and last cell for range
+      rangeString = `${selectedCells[0]}:${selectedCells[selectedCells.length - 1]}`;
+    }
+    
+    // Don't auto-update recoil state here - only on Cmd+K
+    // This is now handled in the Cmd+K keyboard shortcut handler
+  }, [selectedCells]);
+
+  // Update cell range when selection changes
+  // Don't automatically update cell range when selection changes
+  // Remove the automatic update effect to ensure selections don't leak to chat:
+  // useEffect(() => {
+  //   updateSelectedCellRangeForChat();
+  // }, [selectedCells, updateSelectedCellRangeForChat]);
+
+  // Update handleCellClick to completely separate spreadsheet and chat functionality
+  const handleCellClick = (cellId: string, forceEdit = false) => {
+    // Always update selection and active cell on single click
+    setSelectedCells([cellId]);
+    setActiveCell(cellId);
+    
+    // Get cell data and update formula bar for consistency
+    const cellData = activeSheet.cells[cellId] || { value: '', isBold: false, isItalic: false, textAlign: 'left', wrapText: false };
+    const cellValue = cellData.value || '';
+    setFormulaValue(cellValue);
+    setEditValue(cellValue);
+    
+    // Only enter edit mode if forced (e.g., double-click) or if user clicks an already selected cell
+    if (forceEdit) {
+      setIsEditing(true);
+      // Focus on the cell after a short delay
       setTimeout(() => {
         if (activeCellRef.current) {
-          activeCellRef.current.focus()
-          activeCellRef.current.select() // Select text for easier editing
+          activeCellRef.current.focus();
         }
-      }, 0)
-      return
+      }, 0);
+    } else {
+      // For single click, just select but don't edit
+      setIsEditing(false);
     }
-    
-    // If we're editing a different cell, save the current edits before changing
-    if (activeCell && activeCell !== cellId && isEditing) {
-      updateCellValue(activeCell, editValue)
-    }
-    
-    // Set new active cell
-    setActiveCell(cellId)
-    
-    // Always enter edit mode when clicking directly on a cell
-    setIsEditing(forceEdit)
-    
-    // Get cell data and update both formula bar and edit value for consistency
-    const cellData = activeSheet.cells[cellId] || { value: '', isBold: false, isItalic: false, textAlign: 'left', wrapText: false }
-    const cellValue = cellData.value || ''
-    setFormulaValue(cellValue)
-    setEditValue(cellValue)
     
     // Extract column name and row number correctly
     // Match column letters and row numbers with regex
-    const match = cellId.match(/([A-Z]+)(\d+)/)
+    const match = cellId.match(/([A-Z]+)(\d+)/);
     if (match) {
-      const colName = match[1]
-      const row = parseInt(match[2])
-      const colIndex = getColumnIndex(colName)
+      const colName = match[1];
+      const row = parseInt(match[2]);
+      const colIndex = getColumnIndex(colName);
       
       // Check if we need to add more rows or columns
-      addRowsIfNeeded(row)
-      addColumnsIfNeeded(colIndex)
-    }
-    
-    // If we're forcing edit mode, focus the input field
-    if (forceEdit) {
-      setTimeout(() => {
-        if (activeCellRef.current) {
-          activeCellRef.current.focus()
-          activeCellRef.current.select() // Select all text
-        }
-      }, 0)
+      addRowsIfNeeded(row);
+      addColumnsIfNeeded(colIndex);
     }
   }
 
-  // Handle cell double click - enter edit mode
+  // Handle cell double click - always enter edit mode
   const handleCellDoubleClick = (cellId: string) => {
     // Always enable cell editing on double-click
     handleCellClick(cellId, true);
+    
+    // Ensure we enter edit mode immediately
+    setIsEditing(true);
   }
 
   // Handle formula bar change
@@ -618,24 +635,36 @@ export default function SpreadsheetComponent({
 
   // Handle cell blur (when clicking away from an active cell)
   const handleCellBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    // Prevent race conditions by checking the relatedTarget
+    const relatedTarget = e.relatedTarget as HTMLElement
+  
+    // Don't process blur if focusing another element within the same application
+    // (like formula bar or within the same cell)
+    if (
+      relatedTarget &&
+      (relatedTarget === formulaInputRef.current || 
+       relatedTarget === activeCellRef.current)
+    ) {
+      return
+    }
+  
     // Only apply changes if we're in edit mode
     if (isEditing && activeCell) {
-      // Prevent blur when clicking within the same cell
-      if (
-        e.relatedTarget &&
-        (e.relatedTarget === formulaInputRef.current || 
-         e.relatedTarget === activeCellRef.current)
-      ) {
-        return
-      }
-      
       // Save the current value
       updateCellValue(activeCell, editValue)
+    
+      // Keep editing mode if focus is moving within our app (debounce brief focus loss)
+      if (!relatedTarget || !tableRef.current?.contains(relatedTarget)) {
+        setIsEditing(false)
+      }
     }
   }
 
   // Handle key navigation
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, cellId: string) => {
+    // Always handle events when a cell input is directly focused
+    // (these events happen when the user is actually editing a cell)
+    
     // Extract column name and row number correctly
     const match = cellId.match(/([A-Z]+)(\d+)/)
     if (!match) return;
@@ -1065,7 +1094,7 @@ export default function SpreadsheetComponent({
   }
 
   // Toggle bold for active cell
-  const toggleBold = () => {
+  const toggleBold = useCallback(() => {
     if (!activeCell) return
 
     const newCells = { ...activeSheet.cells }
@@ -1097,10 +1126,10 @@ export default function SpreadsheetComponent({
         activeSheetId 
       })
     }
-  }
+  }, [activeCell, activeSheet, activeSheetId, onDataUpdate, sheets]);
 
   // Toggle italic for active cell
-  const toggleItalic = () => {
+  const toggleItalic = useCallback(() => {
     if (!activeCell) return
 
     const newCells = { ...activeSheet.cells }
@@ -1132,10 +1161,10 @@ export default function SpreadsheetComponent({
         activeSheetId 
       })
     }
-  }
+  }, [activeCell, activeSheet, activeSheetId, onDataUpdate, sheets]);
 
   // Set text alignment for active cell
-  const setTextAlign = (alignment: 'left' | 'center' | 'right') => {
+  const setTextAlign = useCallback((alignment: 'left' | 'center' | 'right') => {
     if (!activeCell) return
 
     const newCells = { ...activeSheet.cells }
@@ -1167,10 +1196,10 @@ export default function SpreadsheetComponent({
         activeSheetId 
       })
     }
-  }
+  }, [activeCell, activeSheet, activeSheetId, onDataUpdate, sheets]);
 
   // Toggle wrap text for active cell
-  const toggleWrapText = () => {
+  const toggleWrapText = useCallback(() => {
     if (!activeCell) return
 
     const newCells = { ...activeSheet.cells }
@@ -1202,7 +1231,7 @@ export default function SpreadsheetComponent({
         activeSheetId 
       })
     }
-  }
+  }, [activeCell, activeSheet, activeSheetId, onDataUpdate, sheets]);
 
   // Handle cell selection (drag)
   const [selectionStart, setSelectionStart] = useState<string | null>(null)
@@ -1287,87 +1316,126 @@ export default function SpreadsheetComponent({
   }
 
   // Set up keyboard shortcuts for formatting, Cmd+K for selection, and Enter for editing
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip if inside an input field that isn't the cell editor
-      if (
-        document.activeElement instanceof HTMLInputElement && 
-        document.activeElement !== activeCellRef.current &&
-        document.activeElement !== formulaInputRef.current
-      ) {
-        return
-      }
+  const handleGlobalKeyDown = useCallback((e: KeyboardEvent) => {
+    // Skip if inside an input field that isn't the cell editor or formula input
+    // This ensures chat input can handle its own keyboard events
+    if (
+      document.activeElement instanceof HTMLInputElement && 
+      document.activeElement !== activeCellRef.current &&
+      document.activeElement !== formulaInputRef.current
+    ) {
+      // Allow keypresses to go to other inputs (e.g., chat input)
+      return
+    }
 
-      // Enter to start editing active cell
-      if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey && activeCell && !isEditing) {
-        e.preventDefault()
-        setIsEditing(true)
-        setTimeout(() => {
-          if (activeCellRef.current) {
-            activeCellRef.current.focus()
-          }
-        }, 10)
-        return
-      }
-
-      // Bold: Ctrl/Cmd + B
-      if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
-        e.preventDefault()
-        toggleBold()
-      }
-      
-      // Italic: Ctrl/Cmd + I
-      if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
-        e.preventDefault()
-        toggleItalic()
-      }
-      
-      // Left align: Ctrl/Cmd + Shift + L
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'l') {
-        e.preventDefault()
-        setTextAlign('left')
-      }
-      
-      // Center align: Ctrl/Cmd + Shift + E
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'e') {
-        e.preventDefault()
-        setTextAlign('center')
-      }
-      
-      // Right align: Ctrl/Cmd + Shift + R
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'r') {
-        e.preventDefault()
-        setTextAlign('right')
-      }
-      
-      // Toggle wrap text: Ctrl/Cmd + Shift + W
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'w') {
-        e.preventDefault()
-        toggleWrapText()
-      }
-      
-      // Cmd+K to send selected cells to chat
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault()
-        
-        if (selectedCells.length > 1) {
-          // Format as a range: first:last or create a comma-separated list
-          const range = `${selectedCells[0]}:${selectedCells[selectedCells.length - 1]}`;
-          if (onCellSelection) {
-            onCellSelection(range);
-          }
-        } else if (activeCell) {
-          // If we only have a single active cell
-          if (onCellSelection) {
-            onCellSelection(activeCell);
-          }
-        }
+    // Skip if focus is inside any chat-related element
+    const chatElements = document.querySelectorAll('.ai-chat-panel, .ai-chat-input');
+    for (const el of chatElements) {
+      if (el.contains(document.activeElement)) {
+        return;
       }
     }
+
+    // Enter to start editing active cell
+    if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey && activeCell && !isEditing) {
+      e.preventDefault()
+      setIsEditing(true)
+      setTimeout(() => {
+        if (activeCellRef.current) {
+          activeCellRef.current.focus()
+        }
+      }, 10)
+      return
+    }
+
+    // Bold: Ctrl/Cmd + B
+    if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+      e.preventDefault()
+      toggleBold()
+    }
     
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedCells, activeCell, isEditing, onCellSelection, toggleBold, toggleItalic, setTextAlign, toggleWrapText])
+    // Italic: Ctrl/Cmd + I
+    if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
+      e.preventDefault()
+      toggleItalic()
+    }
+    
+    // Left align: Ctrl/Cmd + Shift + L
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'l') {
+      e.preventDefault()
+      setTextAlign('left')
+    }
+    
+    // Center align: Ctrl/Cmd + Shift + E
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'e') {
+      e.preventDefault()
+      setTextAlign('center')
+    }
+    
+    // Right align: Ctrl/Cmd + Shift + R
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'r') {
+      e.preventDefault()
+      setTextAlign('right')
+    }
+    
+    // Toggle wrap text: Ctrl/Cmd + Shift + W
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'w') {
+      e.preventDefault()
+      toggleWrapText()
+    }
+    
+    // Cmd+K to send selected cells to chat
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault()
+      
+      // Set the cmdKTriggered state to true to inform other components
+      setCmdKTriggered(true);
+      
+      // Find if there's a chat input to interact with
+      const chatInput = document.querySelector('.ai-chat-input') as HTMLElement;
+      
+      // Only proceed if there's a chat interface available and we have cells selected
+      if (chatInput && (selectedCells.length > 0 || activeCell)) {
+        // Generate the range string here, rather than relying on automatic updates
+        let range = "";
+        
+        if (selectedCells.length > 1) {
+          // Format as a range: first:last
+          range = `${selectedCells[0]}:${selectedCells[selectedCells.length - 1]}`;
+        } else if (activeCell) {
+          // Single cell reference
+          range = activeCell;
+        }
+        
+        // Only now update the selected cell range in Recoil state
+        setRecoilSelectedCellRange(range);
+        
+        if (onCellSelection) {
+          // Send the selected range to the chat
+          onCellSelection(range);
+          
+          // Focus the chat input
+          setTimeout(() => {
+            chatInput.focus();
+            
+            // Reset the cmdKTriggered state after a short delay
+            setTimeout(() => {
+              setCmdKTriggered(false);
+            }, 200);
+          }, 50);
+        }
+      } else {
+        // Reset the flag if we couldn't process the command
+        setCmdKTriggered(false);
+      }
+    }
+  }, [activeCell, isEditing, toggleBold, toggleItalic, setTextAlign, toggleWrapText, 
+      selectedCells, setCmdKTriggered, setRecoilSelectedCellRange, onCellSelection]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleGlobalKeyDown)
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown)
+  }, [handleGlobalKeyDown]);
 
   // Generate column headers (A, B, C, ..., Z, AA, AB, ...)
   const getDisplayColumns = () => {
@@ -1470,6 +1538,15 @@ export default function SpreadsheetComponent({
     return cellCol >= minCol && cellCol <= maxCol && cellRow >= minRow && cellRow <= maxRow;
   };
 
+  // Add mousedown handler to improve cell selection and editing
+  const handleCellMouseDown = (e: React.MouseEvent, cellId: string) => {
+    // Prevent default to avoid losing focus
+    e.preventDefault()
+    
+    // Handle selection start for dragging
+    handleSelectionStart(cellId)
+  }
+
   // Render a single cell
   const renderCell = (rowIndex: number, colIndex: number) => {
     const colName = getColumnName(colIndex)
@@ -1496,14 +1573,29 @@ export default function SpreadsheetComponent({
           ${isInSelectedRange ? 'bg-blue-50' : ''}
           ${isHovered ? 'bg-gray-50' : ''}
         `}
-        onClick={() => handleCellClick(cellId)}
-        onDoubleClick={() => handleCellDoubleClick(cellId)}
-        onMouseEnter={() => setHoveredCell(cellId)}
+        onClick={(e) => {
+          e.stopPropagation() // Prevent event bubbling
+          handleCellClick(cellId)
+        }}
+        onMouseDown={(e) => handleCellMouseDown(e, cellId)}
+        onMouseEnter={() => {
+          // Handle both selection move and hover state
+          if (isSelecting) handleSelectionMove(cellId)
+          setHoveredCell(cellId)
+        }}
+        onMouseUp={() => isSelecting && handleSelectionEnd()}
+        onDoubleClick={(e) => {
+          e.stopPropagation() // Prevent event bubbling
+          handleCellDoubleClick(cellId)
+        }}
         onMouseLeave={() => setHoveredCell(null)}
       >
-        {/* Active cell indicator */}
+        {/* Active cell indicator - ensure it doesn't interfere with clicks */}
         {isActive && (
-          <div className="absolute -inset-[1px] border-2 border-blue-500 pointer-events-none z-0"></div>
+          <div 
+            className="absolute -inset-[1px] border-2 border-blue-500 pointer-events-none" 
+            style={{ zIndex: 1 }} // Explicitly set z-index
+          />
         )}
         
         {/* Cell content */}
@@ -1515,7 +1607,8 @@ export default function SpreadsheetComponent({
               onChange={handleCellChange}
               onBlur={handleCellBlur}
               onKeyDown={(e) => handleKeyDown(e, cellId)}
-              className="h-full w-full border-0 focus-visible:ring-0 p-1 absolute inset-0 bg-transparent focus:outline-none z-10"
+              className="h-full w-full border-0 focus-visible:ring-0 p-1 absolute inset-0 bg-transparent focus:outline-none"
+              style={{ zIndex: 10 }} // Explicitly set z-index
               autoFocus
             />
           ) : (
@@ -1529,8 +1622,82 @@ export default function SpreadsheetComponent({
     )
   }
 
+  // Use a layout effect to ensure focus happens after DOM updates
+  useLayoutEffect(() => {
+    if (isEditing && activeCell && activeCellRef.current) {
+      // Use immediate focus with no delay
+      activeCellRef.current.focus()
+      
+      // Select all text immediately - this is key for good UX
+      try {
+        activeCellRef.current.select()
+      } catch (e) {
+        console.warn('Could not select text in cell input')
+      }
+    }
+  }, [isEditing, activeCell])
+
+  // Add an effect to handle keyboard shortcuts for starting edit mode
+  useEffect(() => {
+    const handleTableKeydown = (e: KeyboardEvent) => {
+      // Don't handle events if focus is in the chat input
+      const chatElements = document.querySelectorAll('.ai-chat-panel, .ai-chat-input');
+      for (const el of chatElements) {
+        if (el.contains(document.activeElement)) {
+          return;
+        }
+      }
+
+      // Only handle keyboard events when there's an active cell and we're not already editing
+      if (activeCell && !isEditing) {
+        // If user types any printable character when a cell is selected, enter edit mode
+        // and start with that character
+        if (
+          e.key.length === 1 && 
+          !e.ctrlKey && 
+          !e.metaKey && 
+          !e.altKey &&
+          !e.shiftKey && // Don't trigger on shift keys
+          document.activeElement === tableRef.current
+        ) {
+          e.preventDefault()
+          setIsEditing(true)
+          setEditValue(e.key)
+          setFormulaValue(e.key)
+          
+          // Focus will happen through the useLayoutEffect
+        }
+        // If user presses F2, enter edit mode with current content
+        else if (e.key === 'F2') {
+          e.preventDefault()
+          setIsEditing(true)
+        }
+      }
+    }
+    
+    // Make the table focusable
+    if (tableRef.current) {
+      tableRef.current.tabIndex = 0
+      tableRef.current.addEventListener('keydown', handleTableKeydown)
+    }
+    
+    return () => {
+      if (tableRef.current) {
+        tableRef.current.removeEventListener('keydown', handleTableKeydown)
+      }
+    }
+  }, [activeCell, isEditing])
+
+  // Enhance the table event handling to ensure it can receive keyboard focus
+  useEffect(() => {
+    if (tableRef.current) {
+      // Make sure the table can receive focus
+      tableRef.current.tabIndex = 0
+    }
+  }, [])
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full spreadsheet-container" tabIndex={0}>
       {/* Toolbar with Formula Bar */}
       <div className="flex items-center p-2 gap-2 border-b">
         {/* Formula Bar */}
@@ -1627,56 +1794,15 @@ export default function SpreadsheetComponent({
                 activeSheetId === sheet.id 
                   ? 'bg-background font-medium' 
                   : 'bg-muted/20 hover:bg-muted/50'
-              }`}
-              onClick={() => {
-                // Only change if clicking a different sheet
-                if (activeSheetId !== sheet.id) {
-                  setActiveSheetId(sheet.id);
-                  setActiveCell(null);
-                }
-              }}
-              onDoubleClick={() => startRenameSheet(sheet.id)}
-            >
-              {editingSheetId === sheet.id ? (
-                <Input
-                  ref={sheetNameInputRef}
-                  value={editingSheetName}
-                  onChange={(e) => setEditingSheetName(e.target.value)}
-                  onBlur={finishRenameSheet}
-                  onKeyDown={handleSheetNameKeyDown}
-                  className="h-6 w-24 text-xs py-0 px-1"
-                  onClick={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <>
-                  <span className="text-sm whitespace-nowrap">{sheet.name}</span>
-                  {/* Only show delete button if we have more than one sheet */}
-                  {sheets.length > 1 && (
-                    <button
-                      className="ml-2 text-xs opacity-0 group-hover:opacity-100 hover:text-red-500"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteSheet(sheet.id);
-                      }}
-                    >
-                      ×
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          ))}
-          
-          {/* Add new sheet button */}
-          <button
-            className="flex items-center justify-center h-8 w-8 rounded-md hover:bg-muted/50"
-            onClick={addNewSheet}
-            title="Add new sheet"
+              }`
+            }
+            onClick={() => setActiveSheetId(sheet.id)}
           >
-            <span className="text-lg">+</span>
-          </button>
+            {sheet.name}
+          </div>
+          ))}
         </div>
       </div>
     </div>
-  );
+  )
 }

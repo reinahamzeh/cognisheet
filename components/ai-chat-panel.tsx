@@ -1,10 +1,12 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from "react"
+import { useRecoilState, useSetRecoilState } from "recoil"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Send, User, PlusCircle, History, Brain, Edit, X, BarChart3, TableProperties, Globe, Check, StopCircle } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu"
+import { selectedCellRangeState, isChatFocusedState, isChatOpenState, cmdKTriggeredState } from "../atoms/spreadsheetAtoms"
 
 // Define props interface
 interface AIChatPanelProps {
@@ -16,7 +18,7 @@ const initialMessages = [
   {
     id: "1",
     role: "assistant",
-    content: "Hello! I'm your AI assistant for CogniSheet. How can I help you with your spreadsheet today?",
+    content: "Hello! I'm your AI assistant for CogniSheet. I'm here to help when you need me - just ask a question or use Cmd+K to reference cells.",
     timestamp: new Date(Date.now() - 60000).toISOString(),
     isEditing: false,
   },
@@ -48,6 +50,12 @@ export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  
+  // Use Recoil state for chat focus and selected cell range
+  const [isChatFocused, setIsChatFocused] = useRecoilState(isChatFocusedState)
+  const [recoilSelectedCellRange] = useRecoilState(selectedCellRangeState)
+  const [isChatOpen, setIsChatOpen] = useRecoilState(isChatOpenState)
+  const [cmdKTriggered] = useRecoilState(cmdKTriggeredState)
 
   // Auto-scroll to bottom of messages
   const scrollToBottom = () => {
@@ -60,15 +68,65 @@ export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
 
   // Handle cell range selection via Cmd+K
   useEffect(() => {
-    if (selectedCellRange) {
-      const updatedInput = input ? 
-        `${input} [Range: ${selectedCellRange}]` : 
-        `Analyze data in range ${selectedCellRange}`
+    // Only process the cell range if:
+    // 1. The chat is focused
+    // 2. We have a new range
+    // 3. The Cmd+K trigger has been activated
+    if (recoilSelectedCellRange && isChatFocused && cmdKTriggered) {
+      // Get current cursor position in the input
+      const cursorPosition = inputRef.current?.selectionStart || input.length;
       
-      setInput(updatedInput)
-      inputRef.current?.focus()
+      // Create the formatted cell reference
+      const cellReference = `${recoilSelectedCellRange}`;
+      
+      // Insert the cell reference at cursor position while preserving text before and after
+      const newText = input.substring(0, cursorPosition) + 
+                      cellReference + 
+                      input.substring(cursorPosition);
+      
+      // Update the input with the cell reference inserted at the cursor position
+      setInput(newText);
+      
+      // Ensure focus remains in the chat input
+      inputRef.current?.focus();
+      
+      // Set cursor position to after the inserted cell reference
+      setTimeout(() => {
+        if (inputRef.current) {
+          const newPosition = cursorPosition + cellReference.length;
+          inputRef.current.setSelectionRange(newPosition, newPosition);
+        }
+      }, 10);
     }
-  }, [selectedCellRange])
+  }, [recoilSelectedCellRange, isChatFocused, cmdKTriggered]);
+
+  // Handle input focus/blur events
+  const handleInputFocus = () => {
+    setIsChatFocused(true);
+  };
+
+  const handleInputBlur = () => {
+    // Only blur if we're not in the middle of a Cmd+K operation
+    // This prevents the chat from losing focus right after a cell selection
+    setTimeout(() => {
+      const activeElement = document.activeElement;
+      const chatElements = document.querySelectorAll('.ai-chat-panel, .ai-chat-input');
+      
+      // Check if focus is still within any chat element
+      let focusInChat = false;
+      for (const el of chatElements) {
+        if (el.contains(activeElement)) {
+          focusInChat = true;
+          break;
+        }
+      }
+      
+      // Only update focus state if focus is truly outside of chat
+      if (!focusInChat) {
+        setIsChatFocused(false);
+      }
+    }, 100);
+  };
 
   // Handle sending a message
   const handleSendMessage = () => {
@@ -89,11 +147,12 @@ export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
 
     // Simulate AI response after a delay
     setTimeout(() => {
+      // Responses that don't suggest automatic analysis
       const aiResponses = [
-        "I can help with that! To create a sum formula, select the cell where you want the result, then type =SUM(range) where 'range' is the cells you want to add.",
-        "Let me analyze your data. Based on the numbers in columns B through D, a bar chart would be the best visualization. Would you like me to create one for you?",
-        "I've formatted your selection with currency formatting. Would you like me to apply this to other columns as well?",
-        "I notice you're working with dates. Would you like me to help you create a timeline chart or calculate date differences?",
+        "I can help with that! Let me know which specific cells you'd like me to work with by using Cmd+K to select them or by describing the data range.",
+        "I'd be happy to help. To create a chart, I'll need you to select the data range you want to visualize using Cmd+K, or you can describe which cells to use.",
+        "If you'd like me to apply formatting, please select the cells and use Cmd+K, or specify which range you need formatted.",
+        "I can help with that! For date calculations, please let me know which specific dates you're working with by selecting them or describing where they are in your spreadsheet.",
       ]
 
       const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)]
@@ -126,7 +185,7 @@ export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
       {
         id: Date.now().toString(),
         role: "assistant",
-        content: "Hello! I'm your AI assistant for CogniSheet. How can I help you with your spreadsheet today?",
+        content: "Hello! I'm ready to help with your spreadsheet when you need me. I'll only analyze data you specifically ask about.",
         timestamp: new Date().toISOString(),
         isEditing: false,
       },
@@ -186,7 +245,9 @@ export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
 
   // Use a suggested prompt
   const handleSuggestedPrompt = (promptText: string) => {
+    // Only set the prompt if the user is actively interacting with the chat
     setInput(promptText)
+    setIsChatFocused(true)
     inputRef.current?.focus()
   }
 
@@ -228,7 +289,7 @@ export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full ai-chat-panel">
       <div className="p-3 border-b flex items-center justify-between bg-background">
         <div className="flex items-center">
           <Brain className="h-5 w-5 text-primary mr-2" />
@@ -302,10 +363,12 @@ export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
         </div>
       )}
 
-      {/* Pro Tip */}
-      <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-xs border-b">
-        <span className="font-medium text-blue-600 dark:text-blue-400">Tip:</span> Select multiple cells and press Cmd+K (or Ctrl+K) to instantly reference them in chat.
-      </div>
+      {/* Pro Tip - only show when chat is focused */}
+      {isChatFocused && (
+        <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-xs border-b">
+          <span className="font-medium text-blue-600 dark:text-blue-400">Tip:</span> Select multiple cells and press Cmd+K (or Ctrl+K) to instantly reference them in chat.
+        </div>
+      )}
 
       {/* Messages Area */}
       <div className="flex-1 p-3 overflow-y-auto">
@@ -401,21 +464,23 @@ export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Suggested Prompts */}
-      <div className="p-2 border-t flex flex-wrap gap-1">
-        {suggestedPrompts.map((prompt) => (
-          <Button 
-            key={prompt.id} 
-            variant="outline" 
-            size="sm" 
-            className="text-xs h-7"
-            onClick={() => handleSuggestedPrompt(prompt.text)}
-          >
-            {prompt.icon}
-            {prompt.text}
-          </Button>
-        ))}
-      </div>
+      {/* Suggested Prompts - only shown when chat is actively being used */}
+      {isChatFocused && (
+        <div className="p-2 border-t flex flex-wrap gap-1">
+          {suggestedPrompts.map((prompt) => (
+            <Button 
+              key={prompt.id} 
+              variant="outline" 
+              size="sm" 
+              className="text-xs h-7"
+              onClick={() => handleSuggestedPrompt(prompt.text)}
+            >
+              {prompt.icon}
+              {prompt.text}
+            </Button>
+          ))}
+        </div>
+      )}
 
       {/* Input Area */}
       <div className="p-3 border-t flex items-center gap-2">
@@ -424,7 +489,9 @@ export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
           value={input}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          className="flex-1"
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
+          className="flex-1 ai-chat-input"
           ref={inputRef}
         />
         <Button

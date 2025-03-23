@@ -61,6 +61,7 @@
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.3.0",
     "recharts": "^2.15.1",
+    "recoil": "^0.7.7",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "styled-components": "^6.1.8",
