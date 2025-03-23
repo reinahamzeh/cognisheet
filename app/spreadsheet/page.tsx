@@ -1,3 +1,5 @@
+'use client'
+
 import KeyboardShortcutsHandler from '../../components/KeyboardShortcutsHandler'
 
 export default function SpreadsheetPage() {
