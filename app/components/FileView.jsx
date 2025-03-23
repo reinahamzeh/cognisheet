@@ -113,6 +113,7 @@ const FileStats = styled.span`
 const FileView = () => {
   const { fileName, fileType, headers, rows, handleFileUpload } = useSpreadsheet();
   const [showFullScreen, setShowFullScreen] = useState(false);
+  const [exportFunction, setExportFunction] = useState(null);
 
   const getFileIcon = () => {
     switch (fileType) {
@@ -149,12 +150,20 @@ const FileView = () => {
   };
 
   const handleExport = () => {
-    // Export functionality would be implemented here
-    alert('Export functionality will be implemented soon');
+    if (exportFunction) {
+      exportFunction();
+    } else {
+      alert('Export functionality not available. Please try again later.');
+    }
   };
 
   const toggleFullScreen = () => {
     setShowFullScreen(!showFullScreen);
+  };
+  
+  // Callback to receive the export function from SpreadsheetComponent
+  const handleExportFunctionReceived = (fn) => {
+    setExportFunction(fn);
   };
 
   return (
@@ -229,7 +238,7 @@ const FileView = () => {
       </FileHeader>
       <MainContent>
         <SpreadsheetContainer style={{ flex: showFullScreen ? '1' : undefined }}>
-          <SpreadsheetView />
+          <SpreadsheetView onExport={handleExportFunctionReceived} />
         </SpreadsheetContainer>
         {!showFullScreen && <ChatPanel />}
       </MainContent>

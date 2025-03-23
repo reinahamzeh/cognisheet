@@ -6,16 +6,32 @@ import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Separator } from "./ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
-import { Bold, Italic, AlignLeft, ActivityIcon as Function, BarChart3, Upload, Sun, Moon } from "lucide-react"
+import { ActivityIcon as Function, BarChart3, Upload, Sun, Moon, Download, Grid, Home } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu"
+import Link from "next/link"
+
+interface FormatFunctions {
+  toggleBold: () => void
+  toggleItalic: () => void
+  setTextAlign: (alignment: 'left' | 'center' | 'right') => void
+  toggleWrapText: () => void
+}
 
 interface TopNavbarProps {
   fileName: string
   setFileName: (name: string) => void
   onFileUpload: (file: File) => void
+  onExport?: () => void
+  formatFunctions?: FormatFunctions | null
 }
 
-export default function TopNavbar({ fileName, setFileName, onFileUpload }: TopNavbarProps) {
+export default function TopNavbar({ 
+  fileName, 
+  setFileName, 
+  onFileUpload, 
+  onExport,
+  formatFunctions 
+}: TopNavbarProps) {
   const { theme, setTheme } = useTheme()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isEditing, setIsEditing] = useState(false)
@@ -52,11 +68,14 @@ export default function TopNavbar({ fileName, setFileName, onFileUpload }: TopNa
 
   return (
     <div className="flex items-center justify-between p-2 border-b bg-background">
-      {/* Left section - File name and basic actions */}
+      {/* Left section - Cognisheet branding and file name */}
       <div className="flex items-center space-x-2">
-        <div className="font-bold text-xl bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70 mr-2">
-          CogniSheet
-        </div>
+        <Link href="/" className="flex items-center mr-4 hover:opacity-80 transition-opacity">
+          <Grid className="h-5 w-5 text-primary mr-1" />
+          <div className="font-bold text-xl bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70">
+            Cognisheet
+          </div>
+        </Link>
         <Separator orientation="vertical" className="h-6" />
         {isEditing ? (
           <Input
@@ -74,23 +93,15 @@ export default function TopNavbar({ fileName, setFileName, onFileUpload }: TopNa
         )}
       </div>
 
-      {/* Middle section - Formatting tools */}
-      <div className="flex items-center space-x-1">
-        <Button variant="ghost" size="icon" title="Bold">
-          <Bold className="h-4 w-4" />
+      {/* Middle section - Simplified tools with labels */}
+      <div className="flex items-center space-x-2">
+        <Button variant="ghost" size="sm" title="Insert Formula" className="flex items-center">
+          <Function className="h-4 w-4 mr-1" />
+          <span>Formula</span>
         </Button>
-        <Button variant="ghost" size="icon" title="Italic">
-          <Italic className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="icon" title="Align">
-          <AlignLeft className="h-4 w-4" />
-        </Button>
-        <Separator orientation="vertical" className="h-6 mx-1" />
-        <Button variant="ghost" size="icon" title="Insert Formula">
-          <Function className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="icon" title="Insert Chart">
-          <BarChart3 className="h-4 w-4" />
+        <Button variant="ghost" size="sm" title="Insert Chart" className="flex items-center">
+          <BarChart3 className="h-4 w-4 mr-1" />
+          <span>Charts</span>
         </Button>
         <Separator orientation="vertical" className="h-6 mx-1" />
         <Button variant="ghost" size="sm" onClick={triggerFileUpload} className="flex items-center">
@@ -104,6 +115,12 @@ export default function TopNavbar({ fileName, setFileName, onFileUpload }: TopNa
             accept=".xlsx,.xls,.numbers,.csv"
           />
         </Button>
+        {onExport && (
+          <Button variant="ghost" size="sm" onClick={onExport} className="flex items-center">
+            <Download className="h-4 w-4 mr-1" />
+            <span>Export</span>
+          </Button>
+        )}
       </div>
 
       {/* Right section - Theme toggle and user */}

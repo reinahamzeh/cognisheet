@@ -137,7 +137,7 @@ const LoadingIndicator = styled.div`
   }
 `;
 
-const SpreadsheetView = () => {
+const SpreadsheetView = ({ onExport }) => {
   const { headers, rows, error, loading, handleFileUpload, handleCellSelection, selectedRange } = useSpreadsheet();
   const [selectionStart, setSelectionStart] = useState(null);
   const [selectionEnd, setSelectionEnd] = useState(null);
