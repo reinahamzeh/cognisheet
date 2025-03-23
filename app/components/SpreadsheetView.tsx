@@ -8,6 +8,10 @@ interface Props {
   data: string[][];
   title: string;
   onDataChange: (data: string[][]) => void;
+  enableWebSearch?: boolean;
+  enableCharts?: boolean;
+  enableMultiCellSelection?: boolean;
+  enableDataEnrichment?: boolean;
 }
 
 const Container = styled.div`
@@ -137,50 +141,55 @@ const ChatMessages = styled.div`
   padding: 1rem;
 `;
 
-const SpreadsheetView: React.FC<Props> = ({ data, title, onDataChange }) => {
-  const [processedData, setProcessedData] = useState<string[][]>([]);
+const SpreadsheetView: React.FC<Props> = ({ 
+  data, 
+  title, 
+  onDataChange,
+  enableWebSearch = true,
+  enableCharts = true,
+  enableMultiCellSelection = true,
+  enableDataEnrichment = true
+}) => {
+  const [currentData, setCurrentData] = useState<string[][]>(data);
+  const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
+  const [message, setMessage] = useState<string>('');
+  const [chatLog, setChatLog] = useState<Array<{ sender: 'user' | 'ai'; text: string }>>([
+    { sender: 'ai', text: 'Hello! I can help you analyze this spreadsheet. What would you like to know?' }
+  ]);
   const [columnWidths, setColumnWidths] = useState<number[]>([]);
-  const [chatMessage, setChatMessage] = useState('');
-  
+
+  // All features are enabled regardless of user plan
+
   useEffect(() => {
+    setCurrentData(data);
+    
+    // Initialize column widths if data exists
     if (data && data.length > 0) {
-      // Filter out empty rows and ensure all rows have the same number of columns
       const maxColumns = Math.max(...data.map(row => row.length));
-      const processed = data.map(row => {
-        const newRow = [...row];
-        while (newRow.length < maxColumns) {
-          newRow.push('');
-        }
-        return newRow;
-      }).filter(row => row.some(cell => cell !== ''));
-      
-      setProcessedData(processed);
-      
-      // Initialize column widths
       setColumnWidths(new Array(maxColumns).fill(100));
     }
   }, [data]);
   
   const handleCellChange = (rowIndex: number, colIndex: number, value: string) => {
-    const newData = processedData.map((row, i) => 
+    const newData = currentData.map((row, i) => 
       i === rowIndex 
         ? row.map((cell, j) => j === colIndex ? value : cell)
         : row
     );
     
-    setProcessedData(newData);
+    setCurrentData(newData);
     onDataChange(newData);
   };
   
   const handleSendMessage = () => {
-    if (chatMessage.trim()) {
+    if (message.trim()) {
       // TODO: Implement chat functionality
-      console.log('Sending message:', chatMessage);
-      setChatMessage('');
+      console.log('Sending message:', message);
+      setMessage('');
     }
   };
 
-  if (!processedData || processedData.length === 0) {
+  if (!currentData || currentData.length === 0) {
     return (
       <Container>
         <SpreadsheetContainer>
@@ -188,7 +197,7 @@ const SpreadsheetView: React.FC<Props> = ({ data, title, onDataChange }) => {
             <Title>{title}</Title>
           </Header>
           <SpreadsheetContent>
-            <div>No data available</div>
+            <div>No data to display</div>
           </SpreadsheetContent>
         </SpreadsheetContainer>
         <ChatContainer>
@@ -196,8 +205,8 @@ const SpreadsheetView: React.FC<Props> = ({ data, title, onDataChange }) => {
           <ChatInput>
             <Input 
               placeholder="Ask about your data..."
-              value={chatMessage}
-              onChange={(e) => setChatMessage(e.target.value)}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
             />
             <SendButton onClick={handleSendMessage}>Send</SendButton>
@@ -218,7 +227,7 @@ const SpreadsheetView: React.FC<Props> = ({ data, title, onDataChange }) => {
             <Table>
               <thead>
                 <tr>
-                  {processedData[0].map((_, index) => (
+                  {currentData[0].map((_, index) => (
                     <HeaderCell key={index} width={columnWidths[index]}>
                       {XLSX.utils.encode_col(index)}
                     </HeaderCell>
@@ -226,7 +235,7 @@ const SpreadsheetView: React.FC<Props> = ({ data, title, onDataChange }) => {
                 </tr>
               </thead>
               <tbody>
-                {processedData.map((row, rowIndex) => (
+                {currentData.map((row, rowIndex) => (
                   <tr key={rowIndex}>
                     {row.map((cell, colIndex) => (
                       <Cell key={colIndex} width={columnWidths[colIndex]}>
@@ -250,8 +259,8 @@ const SpreadsheetView: React.FC<Props> = ({ data, title, onDataChange }) => {
         <ChatInput>
           <Input 
             placeholder="Ask about your data..."
-            value={chatMessage}
-            onChange={(e) => setChatMessage(e.target.value)}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
           />
           <SendButton onClick={handleSendMessage}>Send</SendButton>

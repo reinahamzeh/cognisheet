@@ -48,6 +48,7 @@ export default function SpreadsheetUI() {
   const [fileData, setFileData] = useState<SheetsData | null>(null)
   const [exportFn, setExportFn] = useState<(() => void) | null>(null)
   const [formatFunctions, setFormatFunctions] = useState<FormatFunctions | null>(null)
+  const [selectedRange, setSelectedRange] = useState<string | null>(null)
 
   // Handle file uploads via top navbar
   const handleFileUpload = (file: File) => {
@@ -67,6 +68,12 @@ export default function SpreadsheetUI() {
   // Handle receiving formatting functions from SpreadsheetComponent
   const handleFormatFunctions = (functions: FormatFunctions) => {
     setFormatFunctions(functions)
+  }
+
+  // Handle cell selection from SpreadsheetComponent
+  const handleCellSelection = (range: string) => {
+    console.log(`Selected range: ${range}`)
+    setSelectedRange(range)
   }
 
   // Ensure theme component works properly with SSR
@@ -95,12 +102,13 @@ export default function SpreadsheetUI() {
             onDataUpdate={handleDataUpdate} 
             onExport={handleExportFunction}
             onFormatFunctions={handleFormatFunctions}
+            onCellSelection={handleCellSelection}
           />
         </div>
 
         {/* AI Chat Panel (right 1/4) */}
         <div className="w-1/4 h-full flex flex-col bg-muted/30">
-          <AIChatPanel />
+          <AIChatPanel selectedCellRange={selectedRange} />
         </div>
       </div>
     </div>

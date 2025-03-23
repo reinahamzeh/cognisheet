@@ -3,7 +3,13 @@
 import React, { useState, useRef, useEffect } from "react"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
-import { Send, User, Sparkles, PlusCircle, History, Brain } from "lucide-react"
+import { Send, User, PlusCircle, History, Brain, Edit, X, BarChart3, TableProperties, Globe, Check, StopCircle } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu"
+
+// Define props interface
+interface AIChatPanelProps {
+  selectedCellRange?: string | null
+}
 
 // Sample chat messages for demonstration
 const initialMessages = [
@@ -12,6 +18,7 @@ const initialMessages = [
     role: "assistant",
     content: "Hello! I'm your AI assistant for CogniSheet. How can I help you with your spreadsheet today?",
     timestamp: new Date(Date.now() - 60000).toISOString(),
+    isEditing: false,
   },
 ]
 
@@ -22,13 +29,25 @@ const sampleChatHistory = [
   { id: "chat3", title: "Employee Schedule", timestamp: new Date(Date.now() - 259200000).toISOString() },
 ]
 
-export default function AIChatPanel() {
+// Suggested prompt buttons
+const suggestedPrompts = [
+  { id: "analyze", text: "Analyze Data", icon: <TableProperties className="h-3 w-3 mr-1" /> },
+  { id: "chart", text: "Generate a Chart", icon: <BarChart3 className="h-3 w-3 mr-1" /> },
+  { id: "formula", text: "Add Formulas", icon: <Brain className="h-3 w-3 mr-1" /> },
+  { id: "web", text: "Web Search", icon: <Globe className="h-3 w-3 mr-1" /> },
+]
+
+export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
   const [messages, setMessages] = useState(initialMessages)
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [showChatHistory, setShowChatHistory] = useState(false)
   const [chatHistory] = useState(sampleChatHistory)
+  const [isStopping, setIsStopping] = useState(false)
+  const [chatTitle, setChatTitle] = useState("New Conversation")
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // Auto-scroll to bottom of messages
   const scrollToBottom = () => {
@@ -38,6 +57,18 @@ export default function AIChatPanel() {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Handle cell range selection via Cmd+K
+  useEffect(() => {
+    if (selectedCellRange) {
+      const updatedInput = input ? 
+        `${input} [Range: ${selectedCellRange}]` : 
+        `Analyze data in range ${selectedCellRange}`
+      
+      setInput(updatedInput)
+      inputRef.current?.focus()
+    }
+  }, [selectedCellRange])
 
   // Handle sending a message
   const handleSendMessage = () => {
@@ -49,6 +80,7 @@ export default function AIChatPanel() {
       role: "user",
       content: input,
       timestamp: new Date().toISOString(),
+      isEditing: false,
     }
 
     setMessages((prev) => [...prev, userMessage])
@@ -71,11 +103,21 @@ export default function AIChatPanel() {
         role: "assistant",
         content: randomResponse,
         timestamp: new Date().toISOString(),
+        isEditing: false,
       }
 
       setMessages((prev) => [...prev, assistantMessage])
       setIsLoading(false)
     }, 1500)
+  }
+
+  // Handle stopping AI generation
+  const handleStopGeneration = () => {
+    setIsStopping(true)
+    setTimeout(() => {
+      setIsLoading(false)
+      setIsStopping(false)
+    }, 500)
   }
 
   // Start a new chat
@@ -86,19 +128,66 @@ export default function AIChatPanel() {
         role: "assistant",
         content: "Hello! I'm your AI assistant for CogniSheet. How can I help you with your spreadsheet today?",
         timestamp: new Date().toISOString(),
+        isEditing: false,
       },
     ])
+    setChatTitle("New Conversation")
     setInput("")
     setShowChatHistory(false)
   }
 
   // Load a chat from history
-  const handleLoadChat = (chatId: string) => {
+  const handleLoadChat = (chatId: string, title: string) => {
     // In a real app, this would load the chat from a database
     console.log(`Loading chat ${chatId}`)
+    setChatTitle(title)
     setShowChatHistory(false)
     // For demo purposes, we'll just start a new chat
     handleNewChat()
+  }
+
+  // Make message editable
+  const handleEditMessage = (id: string) => {
+    setMessages((prev) => 
+      prev.map((msg) => 
+        msg.id === id ? { ...msg, isEditing: true } : msg
+      )
+    )
+  }
+
+  // Save edited message
+  const handleSaveEdit = (id: string, newContent: string) => {
+    setMessages((prev) => 
+      prev.map((msg) => 
+        msg.id === id ? { ...msg, content: newContent, isEditing: false } : msg
+      )
+    )
+  }
+
+  // Cancel message edit
+  const handleCancelEdit = (id: string) => {
+    setMessages((prev) => 
+      prev.map((msg) => 
+        msg.id === id ? { ...msg, isEditing: false } : msg
+      )
+    )
+  }
+
+  // Handle chat title edit
+  const handleEditTitle = () => {
+    setIsEditingTitle(true)
+  }
+
+  // Save chat title
+  const handleSaveTitle = (newTitle: string) => {
+    setChatTitle(newTitle)
+    setIsEditingTitle(false)
+  }
+
+  // Use a suggested prompt
+  const handleSuggestedPrompt = (promptText: string) => {
+    setInput(promptText)
+    inputRef.current?.focus()
   }
 
   // Handle input change
@@ -126,115 +215,225 @@ export default function AIChatPanel() {
     return date.toLocaleDateString([], { month: "short", day: "numeric" })
   }
 
+  // Handle rename of chat in history via right-click context menu
+  const handleRenameChat = (id: string, newTitle: string) => {
+    console.log(`Renaming chat ${id} to ${newTitle}`)
+    // In a real app, this would update the chat title in a database
+  }
+
+  // Handle delete chat from history via right-click context menu
+  const handleDeleteChat = (id: string) => {
+    console.log(`Deleting chat ${id}`)
+    // In a real app, this would delete the chat from a database
+  }
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-3 border-b flex items-center justify-between bg-background">
         <div className="flex items-center">
           <Brain className="h-5 w-5 text-primary mr-2" />
-          <h2 className="font-medium">AI Assistant</h2>
+          {isEditingTitle ? (
+            <div className="flex items-center">
+              <Input
+                value={chatTitle}
+                onChange={(e) => setChatTitle(e.target.value)}
+                onBlur={() => setIsEditingTitle(false)}
+                onKeyDown={(e) => e.key === "Enter" && setIsEditingTitle(false)}
+                className="h-7 text-sm font-medium w-48"
+                autoFocus
+              />
+              <Button size="icon" variant="ghost" onClick={() => setIsEditingTitle(false)} className="h-7 w-7 ml-1">
+                <Check className="h-3 w-3" />
+              </Button>
+            </div>
+          ) : (
+            <h2 className="font-medium cursor-pointer" onClick={handleEditTitle}>
+              {chatTitle}
+            </h2>
+          )}
         </div>
-        <div className="flex items-center space-x-1">
-          <Button variant="ghost" size="sm" onClick={() => setShowChatHistory(!showChatHistory)} title="Chat History">
-            <History className="h-4 w-4 mr-1" />
-            <span className="text-xs">History</span>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" title="New Chat" onClick={handleNewChat}>
+            <PlusCircle className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={handleNewChat} title="New Chat">
-            <PlusCircle className="h-4 w-4 mr-1" />
-            <span className="text-xs">New Chat</span>
-          </Button>
-          <Button variant="ghost" size="sm" className="text-xs">
-            <Sparkles className="h-3 w-3 mr-1" />
-            Pro
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Chat History"
+            onClick={() => setShowChatHistory(!showChatHistory)}
+          >
+            <History className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      {showChatHistory ? (
-        // Chat History View
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+      {/* Chat History Panel */}
+      {showChatHistory && (
+        <div className="p-2 border-b bg-muted/40">
           <h3 className="text-sm font-medium mb-2">Recent Conversations</h3>
-          {chatHistory.map((chat) => (
-            <div 
-              key={chat.id} 
-              className="p-2 rounded hover:bg-muted cursor-pointer flex justify-between items-center"
-              onClick={() => handleLoadChat(chat.id)}
-            >
-              <div className="flex items-center">
-                <Brain className="h-4 w-4 text-muted-foreground mr-2" />
-                <span className="text-sm">{chat.title}</span>
-              </div>
-              <span className="text-xs text-muted-foreground">{formatDate(chat.timestamp)}</span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        // Messages container
-        <div className="flex-1 overflow-y-auto p-3 space-y-4">
-          {messages.map((message) => (
-            <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div
-                className={`max-w-[85%] rounded-lg p-3 ${
-                  message.role === "user" ? "bg-primary text-primary-foreground ml-4" : "bg-muted mr-4"
-                }`}
-              >
-                <div className="flex items-center mb-1">
-                  {message.role === "assistant" ? <Brain className="h-4 w-4 mr-1" /> : <User className="h-4 w-4 mr-1" />}
-                  <span className="text-xs opacity-70">
-                    {message.role === "assistant" ? "Assistant" : "You"} • {formatTime(message.timestamp)}
-                  </span>
+          <div className="space-y-1 max-h-48 overflow-y-auto">
+            {chatHistory.map((chat) => (
+              <DropdownMenu key={chat.id}>
+                <div className="flex items-center justify-between p-2 text-sm hover:bg-muted rounded cursor-pointer" onClick={() => handleLoadChat(chat.id, chat.title)}>
+                  <div className="truncate flex-1">{chat.title}</div>
+                  <div className="text-xs text-muted-foreground">{formatDate(chat.timestamp)}</div>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 ml-1">
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
                 </div>
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-              </div>
-            </div>
-          ))}
-
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="max-w-[85%] rounded-lg p-3 bg-muted mr-4">
-                <div className="flex items-center">
-                  <Brain className="h-4 w-4 mr-1" />
-                  <span className="text-xs opacity-70">Assistant</span>
-                </div>
-                <div className="mt-2 flex space-x-1">
-                  <div
-                    className="h-2 w-2 rounded-full bg-primary/30 animate-bounce"
-                    style={{ animationDelay: "0ms" }}
-                  ></div>
-                  <div
-                    className="h-2 w-2 rounded-full bg-primary/30 animate-bounce"
-                    style={{ animationDelay: "150ms" }}
-                  ></div>
-                  <div
-                    className="h-2 w-2 rounded-full bg-primary/30 animate-bounce"
-                    style={{ animationDelay: "300ms" }}
-                  ></div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div ref={messagesEndRef} />
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => {
+                    const newTitle = prompt("Enter new chat name:", chat.title)
+                    if (newTitle) handleRenameChat(chat.id, newTitle)
+                  }}>
+                    Rename
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    if (confirm("Delete this chat?")) handleDeleteChat(chat.id)
+                  }}>
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Input area */}
-      <div className="p-3 border-t bg-background">
-        <div className="flex items-center space-x-2">
-          <Input
-            value={input}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask anything about your spreadsheet..."
-            className="flex-1"
-            disabled={isLoading}
-          />
-          <Button size="icon" onClick={handleSendMessage} disabled={!input.trim() || isLoading}>
-            <Send className="h-4 w-4" />
+      {/* Pro Tip */}
+      <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-xs border-b">
+        <span className="font-medium text-blue-600 dark:text-blue-400">Tip:</span> Select multiple cells and press Cmd+K (or Ctrl+K) to instantly reference them in chat.
+      </div>
+
+      {/* Messages Area */}
+      <div className="flex-1 p-3 overflow-y-auto">
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={`mb-4 ${message.role === "user" ? "text-right" : "text-left"}`}
+          >
+            <div
+              className={`inline-block max-w-[85%] p-3 rounded-lg ${
+                message.role === "user"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted"
+              }`}
+            >
+              {message.isEditing ? (
+                <div className="space-y-2">
+                  <Input
+                    value={message.content}
+                    onChange={(e) => {
+                      setMessages((prev) =>
+                        prev.map((msg) =>
+                          msg.id === message.id
+                            ? { ...msg, content: e.target.value }
+                            : msg
+                        )
+                      )
+                    }}
+                    className="text-sm"
+                    autoFocus
+                  />
+                  <div className="flex justify-end gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => handleCancelEdit(message.id)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => handleSaveEdit(message.id, message.content)}
+                    >
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="relative group">
+                  <div className="text-sm whitespace-pre-wrap break-words">{message.content}</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {formatTime(message.timestamp)}
+                  </div>
+                  {message.role === "user" && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6 absolute -right-7 top-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => handleEditMessage(message.id)}
+                    >
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        {isLoading && (
+          <div className="mb-4 text-left">
+            <div className="inline-block max-w-[85%] p-3 rounded-lg bg-muted relative">
+              <div className="flex items-center gap-1">
+                <div className="animate-bounce h-2 w-2 bg-primary rounded-full"></div>
+                <div className="animate-bounce h-2 w-2 bg-primary rounded-full" style={{ animationDelay: "0.2s" }}></div>
+                <div className="animate-bounce h-2 w-2 bg-primary rounded-full" style={{ animationDelay: "0.4s" }}></div>
+              </div>
+              {!isStopping && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="absolute right-3 top-2 h-7 text-xs"
+                  onClick={handleStopGeneration}
+                >
+                  <StopCircle className="h-3 w-3 mr-1" />
+                  Stop
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Suggested Prompts */}
+      <div className="p-2 border-t flex flex-wrap gap-1">
+        {suggestedPrompts.map((prompt) => (
+          <Button 
+            key={prompt.id} 
+            variant="outline" 
+            size="sm" 
+            className="text-xs h-7"
+            onClick={() => handleSuggestedPrompt(prompt.text)}
+          >
+            {prompt.icon}
+            {prompt.text}
           </Button>
-        </div>
-        <div className="mt-2 text-xs text-muted-foreground">
-          <p>Try: "Sum column B" or "Create a chart from this data"</p>
-        </div>
+        ))}
+      </div>
+
+      {/* Input Area */}
+      <div className="p-3 border-t flex items-center gap-2">
+        <Input
+          placeholder="Ask anything about your spreadsheet data..."
+          value={input}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          className="flex-1"
+          ref={inputRef}
+        />
+        <Button
+          size="icon"
+          disabled={!input.trim() || isLoading}
+          onClick={handleSendMessage}
+        >
+          <Send className={`h-4 w-4 ${isLoading ? "opacity-50" : ""}`} />
+        </Button>
       </div>
     </div>
   )

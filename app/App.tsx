@@ -25,10 +25,10 @@ const App: React.FC = () => {
   const [spreadsheetData, setSpreadsheetData] = useState<string[][]>([]);
   const [fileName, setFileName] = useState<string>('');
   
-  // Subscription related state
-  const [showFileLimitModal, setShowFileLimitModal] = useState(false);
-  const [showPricingModal, setShowPricingModal] = useState(false);
-  const { canCreateNewFile, incrementFileCount, isAuthenticated } = useUser();
+  // These should always be false to never show the limit modals
+  const [showFileLimitModal, setShowFileLimitModal] = useState(false)
+  const [showPricingModal, setShowPricingModal] = useState(false)
+  const { incrementFileCount } = useUser();
 
   const parseCSV = (content: string) => {
     console.log('Parsing CSV with content length:', content.length);
@@ -96,24 +96,12 @@ const App: React.FC = () => {
   };
 
   const handleFileUpload = (file: File) => {
-    // Check if user is authenticated and can create a new file
-    if (!isAuthenticated) {
-      // If not authenticated, show pricing modal which will have a sign-in option
-      setShowPricingModal(true);
-      return;
-    }
-    
-    // If user is authenticated but reached file limit
-    if (!canCreateNewFile) {
-      setShowFileLimitModal(true);
-      return;
-    }
-    
+    // No authentication checks - all features enabled for all users
     console.log('File upload started:', file.name, 'size:', file.size, 'type:', file.type);
     setFileName(file.name);
     
-    // Increment the file count in the user context
-    incrementFileCount();
+    // File upload is unrestricted, no need to track count
+    console.log('File count not tracked - all features enabled');
     
     const reader = new FileReader();
     
@@ -151,22 +139,9 @@ const App: React.FC = () => {
   };
 
   const handleNewFile = () => {
-    // Check if user is authenticated and can create a new file
-    if (!isAuthenticated) {
-      // If not authenticated, show pricing modal which will have a sign-in option
-      setShowPricingModal(true);
-      return;
-    }
-    
-    // If user is authenticated but reached file limit
-    if (!canCreateNewFile) {
-      setShowFileLimitModal(true);
-      return;
-    }
-    
     console.log('Creating new file');
     
-    // Increment the file count in the user context
+    // Still increment file count for tracking, but no limit check
     incrementFileCount();
     
     // Create an empty grid 10x10
@@ -199,23 +174,29 @@ const App: React.FC = () => {
           data={spreadsheetData} 
           title={fileName || 'Spreadsheet'}
           onDataChange={handleSpreadsheetDataChange}
+          // All features enabled for all users
+          enableWebSearch={true}
+          enableCharts={true}
+          enableMultiCellSelection={true}
+          enableDataEnrichment={true}
         />
       )}
       
-      {/* Subscription-related modals */}
-      <FileLimitModal 
-        isOpen={showFileLimitModal} 
-        onClose={() => setShowFileLimitModal(false)} 
-        onUpgrade={() => {
-          setShowFileLimitModal(false);
-          setShowPricingModal(true);
-        }} 
-      />
-      
-      <PricingModal 
-        isOpen={showPricingModal} 
-        onClose={() => setShowPricingModal(false)} 
-      />
+      {/* Modals are disabled - set to false so they never show */}
+      {false && (
+        <>
+          <FileLimitModal 
+            isOpen={false}
+            onClose={() => {}}
+            onUpgrade={() => {}}
+          />
+          
+          <PricingModal 
+            isOpen={false}
+            onClose={() => {}}
+          />
+        </>
+      )}
     </AppContainer>
   );
 };

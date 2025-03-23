@@ -3,10 +3,84 @@ description:
 globs: 
 alwaysApply: true
 ---
+# Combined AI Chatbot + Assistant Document for Cognisheet
 
-# AI Chatbot Development Document for Cognisheet
+## AI Assistant Behavior and UI Rules
 
-## Introduction and Overview
+### Navigation Bar Integration
+- Move the **Pro Features** button from the AI assistant chat window into the **main navigation bar**.
+- Remove all traces of the Pro button from the chat view itself.
+
+### Data Intelligence Capabilities
+- AI assistant must be able to:
+  - **Analyze all spreadsheet cell data** in real-time.
+  - **Calculate or summarize** data contextually based on user prompts.
+  - Handle formulas, totals, outliers, and trends without additional input.
+
+### Web Intelligence and Enrichment
+- Enable **web search integration**. If the user requests something like:
+  - “Find Airbnbs in Germany with prices and locations”
+  - “Get company profiles for all companies listed in column A”
+  The assistant should:
+  - Query the web in real time.
+  - Generate a **structured response directly into the spreadsheet cells**.
+
+### Cmd+K Feature (Multi-Select Insight Trigger)
+- Support **multi-cell selection**, especially with `Cmd+K` on macOS (or `Ctrl+K` on Windows).
+- When triggered:
+  - Auto-reference selected cells in the chat box.
+  - Allow the user to ask questions **about just those cells**.
+  - Example: “Analyze trends across these cells” or “Which product had highest growth?”
+
+### Data Enrichment
+- If the user has raw data (e.g., company names, product SKUs), allow AI to **fetch supplemental data from the web**:
+  - Company revenue
+  - Product specs
+  - News coverage
+  - Competitor analysis
+- Results should be written directly into related cells or a new sheet.
+
+### Chat UI Behavior
+- Before any message is sent, display these **suggested prompt buttons**:
+  - Analyze Data
+  - Generate a Chart
+  - Add Formulas
+  - Web Search
+
+- Display a **Pro Tip** UI note:  
+  *“Tip: Select multiple cells and press Cmd+K to instantly reference them in chat.”*
+
+- When a response is in progress, allow the user to **stop AI generation** at any point.
+
+- Messages the user sends should be **editable inline** after sending.
+
+### Chat History
+- Store previous chats in a list with:
+  - Auto titles (default), user-editable via **right-click → Rename**
+  - **Right-click → Delete** functionality
+  - Click to **restore previous chat**, loading its history and thread.
+
+- Inside an open chat, allow the user to **rename the chat session** by clicking the current title.
+
+### Assistant UI and Spreadsheet Interaction Restrictions
+- The AI assistant must not block, override, or interfere with spreadsheet UI interaction.
+- The assistant can observe and analyze spreadsheet state and data, but must not prevent:
+  - Cell selection
+  - Direct cell editing
+  - File uploads
+  - Input focus
+  - Scrolling
+- The assistant should not inject styles, overlays, or DOM elements that interfere with user input.
+
+### Pro Feature Access (Temporarily Disabled)
+- All features (including file upload, web search, charts, enrichment, and multi-cell commands) must be **fully available to all users**, regardless of subscription status.
+- Remove or disable any conditional logic related to `user.isPro`, flags, or plan checks during development/testing.
+
+---
+
+## AI Chatbot Development Document for Cognisheet
+
+### Introduction and Overview
 
 The AI chatbot for Cognisheet is designed to make spreadsheet analysis intuitive and powerful for non-technical users. By understanding user requests conversationally, the chatbot unlocks advanced capabilities without requiring formula expertise or manual data handling. The chatbot will:
 
@@ -15,8 +89,6 @@ The AI chatbot for Cognisheet is designed to make spreadsheet analysis intuitive
 - Produce charts and import them directly into the spreadsheet.
 - Research and scrape the web to pull external data into the spreadsheet.
 - Extract text and structured information from PDFs and images.
-
-This document provides a clear plan for developing these features, ensuring the chatbot is seamlessly integrated into the existing spreadsheet application.
 
 ---
 
@@ -92,36 +164,17 @@ The AI chatbot will live inside the spreadsheet interface, likely as a sidebar o
 
 Assuming the base spreadsheet app is ready, here’s how to build and add the AI chatbot:
 
-### 3. Implement Data Analysis and Visualization
-- Add Python support to analyze data and create visualizations.  
-- Build a way to show these visualizations in the spreadsheet.
-
-### 4. Add Formula Generation
-- Teach the chatbot to make formulas from user requests.  
-- Add steps to check and place formulas in the spreadsheet.
-
-### 5. Integrate Chart Generation
-- Use or improve the spreadsheet’s charting features.  
-- Make the chatbot create and insert charts automatically.
-
-### 6. Enable Web Research and Scraping
-- Link the chatbot to `@firecrawl_dev` and `@ExaAILabs` for web tasks.  
-- Create a system to organize and add scraped data to the spreadsheet.
-
-### 7. Implement Document Data Extraction
-- Add tools to pull text and tables from PDFs and images.  
-- Set up a way to move this data into the spreadsheet.
-
-### 8. Testing and Iteration
-- Test each feature on its own and with the spreadsheet.  
-- Try it with real users to see if it’s easy to use and works well.  
-- Fix any issues and improve based on feedback.
+1. Implement Data Analysis and Visualization  
+2. Add Formula Generation  
+3. Integrate Chart Generation  
+4. Enable Web Research and Scraping  
+5. Implement Document Data Extraction  
+6. Test each feature individually and as part of the full app  
+7. Iterate based on feedback
 
 ---
 
 ## Testing and Validation
-
-To make sure the AI chatbot works perfectly, follow these testing steps:
 
 - **Feature Testing**: Check each part (like formulas or data extraction) works correctly.  
 - **App Testing**: Ensure the chatbot fits into the spreadsheet without problems.  
@@ -132,8 +185,4 @@ To make sure the AI chatbot works perfectly, follow these testing steps:
 
 ## Conclusion
 
-This document lays out a straightforward plan to build the AI chatbot for Cognisheet. By following the features, approach, and roadmap, the team can create a tool that makes spreadsheets smarter and easier to use. Start by setting up the environment and building the chatbot’s core, then add each feature step-by-step, testing along the way to ensure it’s ready for users.
-
---- 
-
-This is everything you need to develop the AI chatbot, tailored to your vision for Cognisheet!
+This document lays out a complete development and behavior plan for the Cognisheet AI chatbot. It ensures all assistant capabilities, spreadsheet features, and user interactions work together fluidly, with no feature gating or input-blocking during testing.

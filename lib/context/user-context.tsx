@@ -18,62 +18,36 @@ const UserContext = createContext<UserContextType | undefined>(undefined)
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const { user, isLoaded, isSignedIn } = useClerkUser()
-  const [isLoading, setIsLoading] = useState(true)
-  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>("free")
+  const [isLoading, setIsLoading] = useState(false)
+  // Permanently set all users to "pro" regardless of subscription status
+  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>("pro")
   const [fileCount, setFileCount] = useState(0)
 
   useEffect(() => {
-    // Only load subscription data when the user is signed in
-    if (!isLoaded) return
-    
-    if (isSignedIn && user) {
-      // Check user's subscription status
-      // In a real app, you'd fetch this from your API/database
-      const checkSubscription = async () => {
-        try {
-          // Mock API call - replace with real API call to your backend
-          // const response = await fetch('/api/user/subscription')
-          // const data = await response.json()
-          // setSubscriptionTier(data.subscriptionTier)
-          // setFileCount(data.fileCount)
-          
-          // For now, we'll just use free tier as default
-          setSubscriptionTier("free")
-          setFileCount(0)
-        } catch (error) {
-          console.error("Failed to fetch subscription data:", error)
-        } finally {
-          setIsLoading(false)
-        }
-      }
-      
-      checkSubscription()
-    } else {
-      // If not signed in, reset to defaults
-      setSubscriptionTier("free")
-      setFileCount(0)
-      setIsLoading(false)
-    }
+    // No need to fetch subscription status, everyone is "pro"
+    setSubscriptionTier("pro")
+    setFileCount(0)
+    setIsLoading(false)
   }, [isLoaded, isSignedIn, user])
 
-  // Determine if user can create a new file based on subscription and usage
-  const canCreateNewFile = subscriptionTier === "pro" || fileCount < 1
+  // Always allow creating new files 
+  const canCreateNewFile = true
 
   // Function to increment file count when user creates a new file
+  // This won't actually restrict anything
   const incrementFileCount = () => {
-    setFileCount(prevCount => prevCount + 1)
-    // In a real app, you'd also update this on your backend
-    // await fetch('/api/user/incrementFileCount', { method: 'POST' })
+    console.log('File count incremented (unrestricted)')
+    // We don't actually increment the count since we don't want to limit files
   }
 
   return (
     <UserContext.Provider 
       value={{
-        isLoading,
-        isAuthenticated: !!isSignedIn,
-        subscriptionTier,
-        fileCount,
-        canCreateNewFile,
+        isLoading: false, // Always false to avoid loading state
+        isAuthenticated: true, // Always authenticated
+        subscriptionTier: "pro", // Always pro
+        fileCount: 0, // Always 0 to avoid limits
+        canCreateNewFile: true, // Always allowed
         incrementFileCount
       }}
     >

@@ -19,6 +19,7 @@ interface SpreadsheetComponentProps {
   onDataUpdate?: (data: { sheets: SheetTab[], activeSheetId: string }) => void
   onExport?: (exportFn: () => void) => void
   onFormatFunctions?: (functions: FormatFunctions) => void
+  onCellSelection?: (selectedRange: string) => void
 }
 
 interface CellData {
@@ -129,7 +130,16 @@ interface SheetTab {
   data: SpreadsheetData;
 }
 
-export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatFunctions }: SpreadsheetComponentProps) {
+// Constants for sizing
+const ROW_HEADER_WIDTH = '40px';
+const COLUMN_WIDTH = '128px';
+
+export default function SpreadsheetComponent({ 
+  onDataUpdate, 
+  onExport, 
+  onFormatFunctions,
+  onCellSelection 
+}: SpreadsheetComponentProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   
   // Create empty data template
@@ -153,7 +163,7 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
   const [activeSheetId, setActiveSheetId] = useState<string>('sheet1');
   
   // Get current sheet data
-  const data = sheets.find(sheet => sheet.id === activeSheetId)?.data || createEmptyData();
+  const activeSheet = sheets.find(sheet => sheet.id === activeSheetId)?.data || createEmptyData();
   
   // Set data function that updates the current sheet
   const setData = (newData: SpreadsheetData) => {
@@ -178,9 +188,13 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
   const [editingSheetId, setEditingSheetId] = useState<string | null>(null)
   const [editingSheetName, setEditingSheetName] = useState<string>("")
   const sheetNameInputRef = useRef<HTMLInputElement>(null)
+  const [selectedCells, setSelectedCells] = useState<string[]>([])
+  const [isEditing, setIsEditing] = useState(false) // Track if cell is in edit mode
+  const tableRef = useRef<HTMLDivElement>(null) // Reference to the table container
+  const [hoveredCell, setHoveredCell] = useState<string | null>(null)
 
   // Generate column headers (A, B, C, ..., Z, AA, AB, ...)
-  const columnHeaders = Array.from({ length: data.columns }, (_, i) => getColumnName(i))
+  const columnHeaders = Array.from({ length: activeSheet.columns }, (_, i) => getColumnName(i))
 
   // Add a new sheet
   const addNewSheet = () => {
@@ -269,7 +283,7 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
   // Set up auto-save functionality
   useEffect(() => {
     const saveInterval = setInterval(() => {
-      if (onDataUpdate && Object.keys(data.cells).length > 0) {
+      if (onDataUpdate && Object.keys(activeSheet.cells).length > 0) {
         console.log('Auto-saving spreadsheet data...');
         // Send all sheets data for saving
         onDataUpdate({ sheets, activeSheetId });
@@ -277,7 +291,7 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
     }, 1500); // Every 1.5 seconds
 
     return () => clearInterval(saveInterval);
-  }, [sheets, activeSheetId, data.cells, onDataUpdate]);
+  }, [sheets, activeSheetId, activeSheet.cells, onDataUpdate]);
 
   // Update visible columns when scrolling horizontally
   const handleHorizontalScroll = (scrollLeft: number) => {
@@ -303,8 +317,9 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
     handleHorizontalScroll(e.currentTarget.scrollLeft);
   }
 
-  // Handle file upload button click
+  // Handle upload button click
   const handleUploadClick = () => {
+    // This should always trigger the file input click, with no restrictions
     if (fileInputRef.current) {
       fileInputRef.current.click()
     }
@@ -378,86 +393,39 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
 
   // Handle file upload
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer)
-        const workbook = XLSX.read(data, { type: 'array' })
-        
-        // Get first sheet
-        const firstSheetName = workbook.SheetNames[0]
-        const worksheet = workbook.Sheets[firstSheetName]
-        
-        // Convert to JSON
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][]
-        
-        // Figure out dimensions
-        const rows = jsonData.length || 25
-        let maxCols = 0
-        jsonData.forEach(row => {
-          maxCols = Math.max(maxCols, row.length)
-        })
-        const columns = Math.max(maxCols, 11) // Ensure at least 11 columns
-        
-        // Create new cells object
-        const newCells: Record<string, CellData> = {}
-        
-        jsonData.forEach((row, rowIndex) => {
-          row.forEach((cellValue, colIndex) => {
-            if (cellValue !== undefined && cellValue !== null) {
-              const colName = getColumnName(colIndex)
-              const cellId = `${colName}${rowIndex + 1}`
-              newCells[cellId] = {
-                value: cellValue.toString(),
-                isBold: false,
-                isItalic: false,
-                textAlign: 'left',
-                wrapText: false
-              }
-            }
-          })
-        })
-        
-        // Create new data
-        const newData: SpreadsheetData = {
-          rows,
-          columns,
-          cells: newCells,
-          headers: Array.from({ length: columns }, (_, i) => getColumnName(i))
-        }
-        
-        // Set file name
-        setFileName(file.name)
-        
-        // Update state
-        setData(newData)
-        if (onDataUpdate) {
-          onDataUpdate({ 
-            sheets: sheets.map(sheet => 
-              sheet.id === activeSheetId 
-                ? { ...sheet, data: newData } 
-                : sheet
-            ), 
-            activeSheetId 
-          })
-        }
-      } catch (error) {
-        console.error('Error parsing file:', error)
-        setErrorMessage('Error parsing file. Please make sure it is a valid spreadsheet.')
-      }
+    const files = event.target.files
+    
+    // Reset any previous error message
+    setErrorMessage(null)
+    
+    if (!files || files.length === 0) {
+      setErrorMessage('No file selected')
+      return
     }
-    reader.readAsArrayBuffer(file)
+    
+    const file = files[0]
+    setFileName(file.name)
+    
+    // Reset the input value to allow selecting the same file again
+    event.target.value = ''
+    
+    const extension = file.name.split('.').pop()?.toLowerCase()
+    
+    if (extension === 'csv') {
+      parseCSV(file)
+    } else if (['xlsx', 'xls', 'numbers'].includes(extension || '')) {
+      parseExcel(file)
+    } else {
+      setErrorMessage('Unsupported file format. Please upload a CSV, Excel, or Numbers file.')
+    }
   }
 
   // Add rows if needed
   const addRowsIfNeeded = (rowIndex: number) => {
-    if (rowIndex >= data.rows - 5) { // If we're within 5 rows of the end
-      const newRows = data.rows + 10 // Add 10 more rows
+    if (rowIndex >= activeSheet.rows - 5) { // If we're within 5 rows of the end
+      const newRows = activeSheet.rows + 10 // Add 10 more rows
       const newData: SpreadsheetData = {
-        ...data,
+        ...activeSheet,
         rows: newRows
       }
       setData(newData)
@@ -477,11 +445,11 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
   // Add columns if needed (supporting beyond Z with AA, AB, etc.)
   const addColumnsIfNeeded = (colIndex: number) => {
     // If we're within 5 columns of the end or the index is beyond current columns, add more
-    if (colIndex >= data.columns - 5 || colIndex >= data.columns) {
+    if (colIndex >= activeSheet.columns - 5 || colIndex >= activeSheet.columns) {
       // Add 5 more columns or enough to include the requested column
-      const neededColumns = Math.max(data.columns + 5, colIndex + 5);
+      const neededColumns = Math.max(activeSheet.columns + 5, colIndex + 5);
       const newData: SpreadsheetData = {
-        ...data,
+        ...activeSheet,
         columns: neededColumns,
         headers: Array.from({ length: neededColumns }, (_, i) => getColumnName(i))
       }
@@ -506,9 +474,47 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
     }
   }
 
+  // Handle cell change (when editing cell directly)
+  const handleCellChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value
+    setEditValue(newValue)
+    setFormulaValue(newValue) // Keep formula bar in sync with cell edit
+  }
+
   // Handle cell click
-  const handleCellClick = (cellId: string) => {
+  const handleCellClick = (cellId: string, forceEdit = false) => {
+    // Clear selection
+    setSelectedCells([cellId])
+    
+    // If clicking on already active cell and not in edit mode, enter edit mode
+    if (activeCell === cellId && !isEditing) {
+      setIsEditing(true)
+      // Focus the cell input immediately
+      setTimeout(() => {
+        if (activeCellRef.current) {
+          activeCellRef.current.focus()
+          activeCellRef.current.select() // Select text for easier editing
+        }
+      }, 0)
+      return
+    }
+    
+    // If we're editing a different cell, save the current edits before changing
+    if (activeCell && activeCell !== cellId && isEditing) {
+      updateCellValue(activeCell, editValue)
+    }
+    
+    // Set new active cell
     setActiveCell(cellId)
+    
+    // Always enter edit mode when clicking directly on a cell
+    setIsEditing(forceEdit)
+    
+    // Get cell data and update both formula bar and edit value for consistency
+    const cellData = activeSheet.cells[cellId] || { value: '', isBold: false, isItalic: false, textAlign: 'left', wrapText: false }
+    const cellValue = cellData.value || ''
+    setFormulaValue(cellValue)
+    setEditValue(cellValue)
     
     // Extract column name and row number correctly
     // Match column letters and row numbers with regex
@@ -520,36 +526,35 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
       
       // Check if we need to add more rows or columns
       addRowsIfNeeded(row)
-      
-      // Always check if we need to expand columns when clicking
-      // This handles the case of clicking on placeholder columns
       addColumnsIfNeeded(colIndex)
-      
-      // After ensuring the cell exists, get its value
-      const cellValue = data.cells[cellId]?.value || ""
-      setEditValue(cellValue)
-      setFormulaValue(cellValue)
+    }
+    
+    // If we're forcing edit mode, focus the input field
+    if (forceEdit) {
+      setTimeout(() => {
+        if (activeCellRef.current) {
+          activeCellRef.current.focus()
+          activeCellRef.current.select() // Select all text
+        }
+      }, 0)
     }
   }
 
-  // Handle cell double click - select all text in the cell
+  // Handle cell double click - enter edit mode
   const handleCellDoubleClick = (cellId: string) => {
-    // Make sure we select all text in the active cell
-    if (activeCellRef.current) {
-      activeCellRef.current.select()
-    }
+    // Always enable cell editing on double-click
+    handleCellClick(cellId, true);
   }
 
-  // Handle cell value change
-  const handleCellChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditValue(e.target.value)
-    // Update formula bar in real-time as well
-    setFormulaValue(e.target.value)
-  }
-  
   // Handle formula bar change
   const handleFormulaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormulaValue(e.target.value)
+    const newValue = e.target.value
+    setFormulaValue(newValue)
+    
+    // If we have an active cell, also update the edit value to keep in sync
+    if (activeCell) {
+      setEditValue(newValue)
+    }
   }
   
   // Handle formula bar key down
@@ -563,17 +568,69 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
           formulaInputRef.current.focus()
         }
       } else {
-        // Otherwise, move focus back to the spreadsheet
-        setActiveCell(null)
+        // Otherwise move focus back to the active cell but exit edit mode
+        setIsEditing(false)
+        if (activeCellRef.current) {
+          activeCellRef.current.focus()
+        }
+      }
+    } else if (e.key === 'Escape') {
+      // On escape, revert to previous value
+      if (activeCell) {
+        const currentData = activeSheet
+        const cellData = currentData.cells[activeCell] || { value: '', isBold: false, isItalic: false, textAlign: 'left', wrapText: false }
+        setFormulaValue(cellData.value)
+        setEditValue(cellData.value)
+        setIsEditing(false)
       }
     }
   }
 
-  // Handle cell blur (save value)
-  const handleCellBlur = () => {
-    if (activeCell) {
+  // Handle clicks outside the cell to exit edit mode and save
+  useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent) => {
+      // If we're editing and the click is outside the active cell and formula input
+      if (isEditing && activeCell && activeCellRef.current && formulaInputRef.current) {
+        // Check if the click was inside the active cell or formula bar
+        const clickedActiveCell = activeCellRef.current.contains(e.target as Node)
+        const clickedFormulaBar = formulaInputRef.current.contains(e.target as Node)
+        const clickedInTable = tableRef.current?.contains(e.target as Node) || false
+        
+        // If the click was not in the active cell or formula bar
+        if (!clickedActiveCell && !clickedFormulaBar) {
+          // Save the current value if editing
+          updateCellValue(activeCell, editValue)
+          setIsEditing(false)
+          
+          // Only clear active cell if clicked outside the table entirely
+          if (!clickedInTable) {
+            setActiveCell(null)
+          }
+        }
+      }
+    }
+    
+    document.addEventListener('mousedown', handleDocumentClick)
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentClick)
+    }
+  }, [isEditing, activeCell, editValue])
+
+  // Handle cell blur (when clicking away from an active cell)
+  const handleCellBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    // Only apply changes if we're in edit mode
+    if (isEditing && activeCell) {
+      // Prevent blur when clicking within the same cell
+      if (
+        e.relatedTarget &&
+        (e.relatedTarget === formulaInputRef.current || 
+         e.relatedTarget === activeCellRef.current)
+      ) {
+        return
+      }
+      
+      // Save the current value
       updateCellValue(activeCell, editValue)
-      setActiveCell(null)
     }
   }
 
@@ -592,47 +649,96 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
     // Get the last visible column index
     const visibleEndIndex = scrollPosition + 10;
     
-    if (e.key === 'Enter') {
-      // Move to the cell below
+    if (e.key === 'Escape') {
+      // Exit edit mode without saving changes
+      const cellData = activeSheet.cells[cellId] || { value: '', isBold: false, isItalic: false, textAlign: 'left', wrapText: false }
+      setEditValue(cellData.value) // Revert to original value
+      setFormulaValue(cellData.value)
+      setIsEditing(false)
       e.preventDefault()
-      if (row < data.rows) {
+    } else if (e.key === 'Enter') {
+      // Save current cell and move to the cell below
+      e.preventDefault()
+      
+      // Save current cell
+      updateCellValue(cellId, editValue)
+      
+      if (row < activeSheet.rows) {
         const nextCellId = `${colName}${row + 1}`
-        updateCellValue(cellId, editValue)
         setActiveCell(nextCellId)
-        setEditValue(data.cells[nextCellId]?.value || "")
-        setFormulaValue(data.cells[nextCellId]?.value || "") // Update formula bar
+        setEditValue(activeSheet.cells[nextCellId]?.value || "")
+        setFormulaValue(activeSheet.cells[nextCellId]?.value || "") // Update formula bar
+        
+        // Only auto-enter edit mode if they were in edit mode
+        setIsEditing(isEditing)
+        
+        // Focus the next cell if editing
+        if (isEditing) {
+          requestAnimationFrame(() => {
+            if (activeCellRef.current) {
+              activeCellRef.current.focus()
+            }
+          })
+        }
         
         // Check if we need to add more rows
         addRowsIfNeeded(row + 1)
       } else {
-        handleCellBlur()
+        // At the last row, just exit edit mode
+        setIsEditing(false)
       }
     } else if (e.key === 'Tab') {
       // Move to the next cell to the right
       e.preventDefault()
-      if (colIndex < data.columns - 1) {
+      
+      // Save current cell
+      updateCellValue(cellId, editValue)
+      
+      if (colIndex < activeSheet.columns - 1) {
         const nextCol = getColumnName(colIndex + 1) // Get next column name
         const nextCellId = `${nextCol}${row}`
-        updateCellValue(cellId, editValue)
         setActiveCell(nextCellId)
-        setEditValue(data.cells[nextCellId]?.value || "")
-        setFormulaValue(data.cells[nextCellId]?.value || "") // Update formula bar
+        setEditValue(activeSheet.cells[nextCellId]?.value || "")
+        setFormulaValue(activeSheet.cells[nextCellId]?.value || "") // Update formula bar
+        
+        // Only auto-enter edit mode if they were in edit mode
+        setIsEditing(isEditing)
+        
+        // Focus the next cell if editing
+        if (isEditing) {
+          requestAnimationFrame(() => {
+            if (activeCellRef.current) {
+              activeCellRef.current.focus()
+            }
+          })
+        }
         
         // Check if we're at the edge of visible area
         if (colIndex === visibleEndIndex) {
           // Scroll to show the next column
-          setScrollPosition(Math.min(data.columns - 11, scrollPosition + 1))
+          setScrollPosition(Math.min(activeSheet.columns - 11, scrollPosition + 1))
         }
         
         // Check if we need to add more columns
         addColumnsIfNeeded(colIndex + 1)
-      } else if (row < data.rows) {
+      } else if (row < activeSheet.rows) {
         // Move to the first cell of the next row
         const nextCellId = `A${row + 1}`
-        updateCellValue(cellId, editValue)
         setActiveCell(nextCellId)
-        setEditValue(data.cells[nextCellId]?.value || "")
-        setFormulaValue(data.cells[nextCellId]?.value || "") // Update formula bar
+        setEditValue(activeSheet.cells[nextCellId]?.value || "")
+        setFormulaValue(activeSheet.cells[nextCellId]?.value || "") // Update formula bar
+        
+        // Only auto-enter edit mode if they were in edit mode
+        setIsEditing(isEditing)
+        
+        // Focus the next cell if editing
+        if (isEditing) {
+          requestAnimationFrame(() => {
+            if (activeCellRef.current) {
+              activeCellRef.current.focus()
+            }
+          })
+        }
         
         // Reset horizontal scroll position to the beginning
         setScrollPosition(0)
@@ -640,27 +746,40 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
         // Check if we need to add more rows
         addRowsIfNeeded(row + 1)
       } else {
-        handleCellBlur()
+        // At the last cell, just exit edit mode
+        setIsEditing(false)
       }
     } else if (e.key === 'ArrowUp' && !e.shiftKey) {
       // Move to the cell above
       e.preventDefault()
+      
+      // Save current cell
+      updateCellValue(cellId, editValue)
+      
       if (row > 1) {
         const nextCellId = `${colName}${row - 1}`
-        updateCellValue(cellId, editValue)
         setActiveCell(nextCellId)
-        setEditValue(data.cells[nextCellId]?.value || "")
-        setFormulaValue(data.cells[nextCellId]?.value || "") // Update formula bar
+        setEditValue(activeSheet.cells[nextCellId]?.value || "")
+        setFormulaValue(activeSheet.cells[nextCellId]?.value || "") // Update formula bar
+        
+        // Only auto-enter edit mode if they were in edit mode and not using keyboard navigation
+        setIsEditing(false) // Exit edit mode for keyboard navigation
       }
     } else if (e.key === 'ArrowDown' && !e.shiftKey) {
       // Move to the cell below
       e.preventDefault()
-      if (row < data.rows) {
+      
+      // Save current cell
+      updateCellValue(cellId, editValue)
+      
+      if (row < activeSheet.rows) {
         const nextCellId = `${colName}${row + 1}`
-        updateCellValue(cellId, editValue)
         setActiveCell(nextCellId)
-        setEditValue(data.cells[nextCellId]?.value || "")
-        setFormulaValue(data.cells[nextCellId]?.value || "") // Update formula bar
+        setEditValue(activeSheet.cells[nextCellId]?.value || "")
+        setFormulaValue(activeSheet.cells[nextCellId]?.value || "") // Update formula bar
+        
+        // Only auto-enter edit mode if they were in edit mode and not using keyboard navigation
+        setIsEditing(false) // Exit edit mode for keyboard navigation
         
         // Check if we need to add more rows
         addRowsIfNeeded(row + 1)
@@ -668,29 +787,41 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
     } else if (e.key === 'ArrowLeft' && !e.shiftKey) {
       // Move to the cell to the left
       e.preventDefault()
+      
+      // Save current cell
+      updateCellValue(cellId, editValue)
+      
       if (colIndex > 0) {
         const nextCol = getColumnName(colIndex - 1) // Get previous column name
         const nextCellId = `${nextCol}${row}`
-        updateCellValue(cellId, editValue)
         setActiveCell(nextCellId)
-        setEditValue(data.cells[nextCellId]?.value || "")
-        setFormulaValue(data.cells[nextCellId]?.value || "") // Update formula bar
+        setEditValue(activeSheet.cells[nextCellId]?.value || "")
+        setFormulaValue(activeSheet.cells[nextCellId]?.value || "") // Update formula bar
+        
+        // Only auto-enter edit mode if they were in edit mode and not using keyboard navigation
+        setIsEditing(false) // Exit edit mode for keyboard navigation
       }
     } else if (e.key === 'ArrowRight' && !e.shiftKey) {
       // Move to the cell to the right
       e.preventDefault()
-      if (colIndex < data.columns - 1) {
+      
+      // Save current cell
+      updateCellValue(cellId, editValue)
+      
+      if (colIndex < activeSheet.columns - 1) {
         const nextCol = getColumnName(colIndex + 1) // Get next column name
         const nextCellId = `${nextCol}${row}`
-        updateCellValue(cellId, editValue)
         setActiveCell(nextCellId)
-        setEditValue(data.cells[nextCellId]?.value || "")
-        setFormulaValue(data.cells[nextCellId]?.value || "") // Update formula bar
+        setEditValue(activeSheet.cells[nextCellId]?.value || "")
+        setFormulaValue(activeSheet.cells[nextCellId]?.value || "") // Update formula bar
+        
+        // Only auto-enter edit mode if they were in edit mode and not using keyboard navigation
+        setIsEditing(false) // Exit edit mode for keyboard navigation
         
         // Check if we're at the edge of visible area
         if (colIndex === visibleEndIndex) {
           // Scroll to show the next column
-          setScrollPosition(Math.min(data.columns - 11, scrollPosition + 1))
+          setScrollPosition(Math.min(activeSheet.columns - 11, scrollPosition + 1))
         }
         
         // Check if we need to add more columns
@@ -701,7 +832,7 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
 
   // Update cell value and formatting function
   const updateCellValue = (cellId: string, value: string) => {
-    const newCells = { ...data.cells }
+    const newCells = { ...activeSheet.cells }
     
     // Check if the value is a formula
     let displayValue = value
@@ -743,7 +874,7 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
       wrapText: newCells[cellId]?.wrapText || false
     }
     
-    const newData: SpreadsheetData = { ...data, cells: newCells }
+    const newData: SpreadsheetData = { ...activeSheet, cells: newCells }
     setData(newData)
     if (onDataUpdate) {
       onDataUpdate({ 
@@ -840,7 +971,7 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
   // Get cell value and styling for display
   const getCellDisplay = (row: number, col: string) => {
     const cellId = `${col}${row}`
-    const cell = data.cells[cellId]
+    const cell = activeSheet.cells[cellId]
     
     if (!cell) {
       return { 
@@ -860,9 +991,11 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
     }
   }
 
-  // Render cell with formatting
-  const renderCellContent = (cell: CellData) => {
-    let content = cell.value
+  // Render cell content with proper formatting
+  const renderCellContent = (cellData: CellData): string => {
+    if (!cellData) return '';
+    
+    let content = cellData.value || '';
     
     // If the content is a formula, try to evaluate it
     if (content.startsWith('=')) {
@@ -875,7 +1008,7 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
         if (hasCellReferences(expression)) {
           // Resolve cell references to their values
           console.log(`Rendering formula with cell references: ${expression}`)
-          const resolvedExpression = resolveCellReferences(expression, data.cells)
+          const resolvedExpression = resolveCellReferences(expression, activeSheet.cells)
           console.log(`Resolved expression: ${resolvedExpression}`)
           
           // Evaluate the resolved expression
@@ -905,39 +1038,37 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
       }
     }
     
-    // Apply formatting
-    if (cell.isBold) {
-      content = `<b>${content}</b>`
+    // Escape HTML for safety (skip for formulas that have already evaluated to #ERROR)
+    if (content !== '#ERROR') {
+      content = content.replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Apply text formatting
+    if (cellData.isBold) {
+      content = `<strong>${content}</strong>`;
     }
     
-    if (cell.isItalic) {
-      content = `<i>${content}</i>`
+    if (cellData.isItalic) {
+      content = `<em>${content}</em>`;
     }
     
-    // Apply text-align and wrap styles using className
-    const cellStyle: React.CSSProperties = {
-      textAlign: cell.textAlign,
-      whiteSpace: cell.wrapText ? 'normal' : 'nowrap',
-      height: '100%',
-      width: '100%',
-      overflow: 'hidden',
-      fontSize: '0.875rem' // text-sm equivalent
-    }
+    // Handle numeric alignment automatically if it's a number
+    const isNumeric = !isNaN(Number(content)) && content.trim() !== '';
+    const alignment = cellData.textAlign || (isNumeric ? 'right' : 'left');
     
-    return (
-      <div 
-        className="h-full w-full overflow-hidden" 
-        style={cellStyle}
-        dangerouslySetInnerHTML={{ __html: content }} 
-      />
-    )
+    // Add wrapper span with alignment style
+    return `<span style="display:block; width:100%; height:100%; overflow:hidden; text-overflow:ellipsis; text-align:${alignment}; white-space:${cellData.wrapText ? 'normal' : 'nowrap'};">${content}</span>`;
   }
 
   // Toggle bold for active cell
   const toggleBold = () => {
     if (!activeCell) return
 
-    const newCells = { ...data.cells }
+    const newCells = { ...activeSheet.cells }
     
     if (newCells[activeCell]) {
       newCells[activeCell] = {
@@ -954,7 +1085,7 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
       }
     }
     
-    const newData = { ...data, cells: newCells }
+    const newData = { ...activeSheet, cells: newCells }
     setData(newData)
     if (onDataUpdate) {
       onDataUpdate({ 
@@ -972,7 +1103,7 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
   const toggleItalic = () => {
     if (!activeCell) return
 
-    const newCells = { ...data.cells }
+    const newCells = { ...activeSheet.cells }
     
     if (newCells[activeCell]) {
       newCells[activeCell] = {
@@ -989,7 +1120,7 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
       }
     }
     
-    const newData = { ...data, cells: newCells }
+    const newData = { ...activeSheet, cells: newCells }
     setData(newData)
     if (onDataUpdate) {
       onDataUpdate({ 
@@ -1007,7 +1138,7 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
   const setTextAlign = (alignment: 'left' | 'center' | 'right') => {
     if (!activeCell) return
 
-    const newCells = { ...data.cells }
+    const newCells = { ...activeSheet.cells }
     
     if (newCells[activeCell]) {
       newCells[activeCell] = {
@@ -1024,7 +1155,7 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
       }
     }
     
-    const newData = { ...data, cells: newCells }
+    const newData = { ...activeSheet, cells: newCells }
     setData(newData)
     if (onDataUpdate) {
       onDataUpdate({ 
@@ -1042,7 +1173,7 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
   const toggleWrapText = () => {
     if (!activeCell) return
 
-    const newCells = { ...data.cells }
+    const newCells = { ...activeSheet.cells }
     
     if (newCells[activeCell]) {
       newCells[activeCell] = {
@@ -1059,7 +1190,7 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
       }
     }
     
-    const newData = { ...data, cells: newCells }
+    const newData = { ...activeSheet, cells: newCells }
     setData(newData)
     if (onDataUpdate) {
       onDataUpdate({ 
@@ -1073,15 +1204,109 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
     }
   }
 
-  // Set up keyboard shortcuts for formatting
+  // Handle cell selection (drag)
+  const [selectionStart, setSelectionStart] = useState<string | null>(null)
+  const [isSelecting, setIsSelecting] = useState(false)
+  
+  const handleSelectionStart = (cellId: string) => {
+    setSelectionStart(cellId)
+    setIsSelecting(true)
+    setSelectedCells([cellId])
+  }
+  
+  const handleSelectionMove = (cellId: string) => {
+    if (!isSelecting || !selectionStart) return
+    
+    // Get row and column for start and current cells
+    const startMatch = selectionStart.match(/([A-Z]+)(\d+)/)
+    const currMatch = cellId.match(/([A-Z]+)(\d+)/)
+    
+    if (!startMatch || !currMatch) return
+    
+    const startCol = startMatch[1]
+    const startRow = parseInt(startMatch[2])
+    const currCol = currMatch[1]
+    const currRow = parseInt(currMatch[2])
+    
+    // Calculate the selection range
+    const startColIndex = getColumnIndex(startCol)
+    const currColIndex = getColumnIndex(currCol)
+    
+    const minColIndex = Math.min(startColIndex, currColIndex)
+    const maxColIndex = Math.max(startColIndex, currColIndex)
+    const minRow = Math.min(startRow, currRow)
+    const maxRow = Math.max(startRow, currRow)
+    
+    // Create an array of all cells in the selection range
+    const selectedRange: string[] = []
+    
+    for (let row = minRow; row <= maxRow; row++) {
+      for (let col = minColIndex; col <= maxColIndex; col++) {
+        const colName = getColumnName(col)
+        selectedRange.push(`${colName}${row}`)
+      }
+    }
+    
+    setSelectedCells(selectedRange)
+  }
+  
+  const handleSelectionEnd = () => {
+    setIsSelecting(false)
+    
+    // If cells are selected, prepare a range description
+    if (selectedCells.length > 0 && onCellSelection) {
+      // Format the range (e.g. "A1:C3")
+      let rangeDescription = ""
+      
+      if (selectedCells.length === 1) {
+        rangeDescription = selectedCells[0]
+      } else {
+        // Find min and max coordinates
+        const cellCoords = selectedCells.map(cell => {
+          const match = cell.match(/([A-Z]+)(\d+)/)
+          if (!match) return { col: 0, row: 0 }
+          return {
+            col: getColumnIndex(match[1]),
+            row: parseInt(match[2])
+          }
+        })
+        
+        const minCol = Math.min(...cellCoords.map(c => c.col))
+        const maxCol = Math.max(...cellCoords.map(c => c.col))
+        const minRow = Math.min(...cellCoords.map(c => c.row))
+        const maxRow = Math.max(...cellCoords.map(c => c.row))
+        
+        const topLeft = `${getColumnName(minCol)}${minRow}`
+        const bottomRight = `${getColumnName(maxCol)}${maxRow}`
+        
+        rangeDescription = `${topLeft}:${bottomRight}`
+      }
+      
+      onCellSelection(rangeDescription)
+    }
+  }
+
+  // Set up keyboard shortcuts for formatting, Cmd+K for selection, and Enter for editing
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip if no active cell or if inside an input field that isn't the cell editor
-      if (!activeCell || (
+      // Skip if inside an input field that isn't the cell editor
+      if (
         document.activeElement instanceof HTMLInputElement && 
         document.activeElement !== activeCellRef.current &&
         document.activeElement !== formulaInputRef.current
-      )) {
+      ) {
+        return
+      }
+
+      // Enter to start editing active cell
+      if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey && activeCell && !isEditing) {
+        e.preventDefault()
+        setIsEditing(true)
+        setTimeout(() => {
+          if (activeCellRef.current) {
+            activeCellRef.current.focus()
+          }
+        }, 10)
         return
       }
 
@@ -1120,11 +1345,29 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
         e.preventDefault()
         toggleWrapText()
       }
+      
+      // Cmd+K to send selected cells to chat
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        
+        if (selectedCells.length > 1) {
+          // Format as a range: first:last or create a comma-separated list
+          const range = `${selectedCells[0]}:${selectedCells[selectedCells.length - 1]}`;
+          if (onCellSelection) {
+            onCellSelection(range);
+          }
+        } else if (activeCell) {
+          // If we only have a single active cell
+          if (onCellSelection) {
+            onCellSelection(activeCell);
+          }
+        }
+      }
     }
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeCell]) // Dependencies
+  }, [selectedCells, activeCell, isEditing, onCellSelection, toggleBold, toggleItalic, setTextAlign, toggleWrapText])
 
   // Generate column headers (A, B, C, ..., Z, AA, AB, ...)
   const getDisplayColumns = () => {
@@ -1154,6 +1397,136 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
     
     // Always return exactly 11 columns
     return visibleColumns;
+  }
+
+  const getCellClasses = (cellId: string, cellData: CellData) => {
+    const classes = ['border', 'border-border', 'p-1', 'h-8', 'focus:outline-none', 'focus:ring-1', 'focus:ring-primary']
+    
+    // Add text alignment
+    if (cellData.textAlign === 'center') {
+      classes.push('text-center')
+    } else if (cellData.textAlign === 'right') {
+      classes.push('text-right')
+    }
+    
+    // Add bold if needed
+    if (cellData.isBold) {
+      classes.push('font-bold')
+    }
+    
+    // Add italic if needed
+    if (cellData.isItalic) {
+      classes.push('italic')
+    }
+    
+    // Add wrap text if needed
+    if (cellData.wrapText) {
+      classes.push('whitespace-normal')
+    } else {
+      classes.push('whitespace-nowrap')
+    }
+    
+    // Add active cell highlighting
+    if (cellId === activeCell) {
+      classes.push('ring-2 ring-primary z-10')
+    }
+    
+    // Add selection highlighting
+    if (selectedCells.includes(cellId)) {
+      classes.push('bg-primary/10')
+    }
+    
+    return classes.join(' ')
+  }
+
+  // Helper function to check if a cell is in a selected range
+  const isInRange = (cellId: string, selectedRange: string[]): boolean => {
+    if (selectedRange.length <= 1) return false;
+    
+    // Extract the start and end cells
+    const startCell = selectedRange[0];
+    const endCell = selectedRange[selectedRange.length - 1];
+    
+    // Parse the cell coordinates
+    const startMatch = startCell.match(/([A-Z]+)(\d+)/);
+    const endMatch = endCell.match(/([A-Z]+)(\d+)/);
+    const cellMatch = cellId.match(/([A-Z]+)(\d+)/);
+    
+    if (!startMatch || !endMatch || !cellMatch) return false;
+    
+    const startCol = getColumnIndex(startMatch[1]);
+    const startRow = parseInt(startMatch[2]);
+    const endCol = getColumnIndex(endMatch[1]);
+    const endRow = parseInt(endMatch[2]);
+    const cellCol = getColumnIndex(cellMatch[1]);
+    const cellRow = parseInt(cellMatch[2]);
+    
+    // Check if the cell is within the range
+    const minCol = Math.min(startCol, endCol);
+    const maxCol = Math.max(startCol, endCol);
+    const minRow = Math.min(startRow, endRow);
+    const maxRow = Math.max(startRow, endRow);
+    
+    return cellCol >= minCol && cellCol <= maxCol && cellRow >= minRow && cellRow <= maxRow;
+  };
+
+  // Render a single cell
+  const renderCell = (rowIndex: number, colIndex: number) => {
+    const colName = getColumnName(colIndex)
+    const cellId = `${colName}${rowIndex}`
+    
+    const cellData = activeSheet.cells[cellId] || { value: '', isBold: false, isItalic: false, textAlign: 'left', wrapText: false }
+    const isActive = activeCell === cellId
+    const isSelected = selectedCells.includes(cellId)
+    
+    // Determine if the cell is part of the selected range
+    const isInSelectedRange = isInRange(cellId, selectedCells)
+    
+    // Determine whether cell is hovered
+    const isHovered = hoveredCell === cellId
+    
+    return (
+      <td
+        key={cellId}
+        id={cellId}
+        className={`
+          relative border border-gray-300 p-0 h-9 min-h-9 max-h-9 w-32 min-w-32 max-w-32 box-border
+          transition-colors
+          ${isSelected ? 'bg-blue-100' : ''}
+          ${isInSelectedRange ? 'bg-blue-50' : ''}
+          ${isHovered ? 'bg-gray-50' : ''}
+        `}
+        onClick={() => handleCellClick(cellId)}
+        onDoubleClick={() => handleCellDoubleClick(cellId)}
+        onMouseEnter={() => setHoveredCell(cellId)}
+        onMouseLeave={() => setHoveredCell(null)}
+      >
+        {/* Active cell indicator */}
+        {isActive && (
+          <div className="absolute -inset-[1px] border-2 border-blue-500 pointer-events-none z-0"></div>
+        )}
+        
+        {/* Cell content */}
+        <div className="relative w-full h-full">
+          {isActive && isEditing ? (
+            <Input
+              ref={activeCellRef}
+              value={editValue}
+              onChange={handleCellChange}
+              onBlur={handleCellBlur}
+              onKeyDown={(e) => handleKeyDown(e, cellId)}
+              className="h-full w-full border-0 focus-visible:ring-0 p-1 absolute inset-0 bg-transparent focus:outline-none z-10"
+              autoFocus
+            />
+          ) : (
+            <div 
+              className="h-full w-full overflow-hidden p-1 cursor-default"
+              dangerouslySetInnerHTML={{ __html: renderCellContent(cellData) }}
+            />
+          )}
+        </div>
+      </td>
+    )
   }
 
   return (
@@ -1204,6 +1577,7 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
           scrollbarColor: 'rgba(155, 155, 155, 0.5) transparent', // Firefox
         }} 
         onScroll={handleScroll}
+        ref={tableRef}
       >
         <div className="min-w-max"> {/* Ensure content doesn't shrink */}
           <table className="border-collapse w-auto">
@@ -1224,49 +1598,18 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
               </tr>
             </thead>
             <tbody>
-              {Array.from({ length: data.rows }, (_, rowIndex) => (
-                <tr key={rowIndex}>
+              {Array.from({ length: 25 }).map((_, rowIndex) => (
+                <tr key={rowIndex + 1} className="h-9">
                   {/* Row headers */}
-                  <td className="sticky left-0 z-10 bg-muted/50 border border-border text-xs text-muted-foreground text-center w-10 h-8">
+                  <th 
+                    className="sticky left-0 z-20 bg-gray-100 border border-gray-300 font-normal text-sm text-center"
+                    style={{ minWidth: ROW_HEADER_WIDTH, width: ROW_HEADER_WIDTH }}
+                  >
                     {rowIndex + 1}
-                  </td>
+                  </th>
                   
                   {/* Cells - only show the visible columns (11) */}
-                  {getDisplayColumns().map((col) => {
-                    const cellId = `${col}${rowIndex + 1}`
-                    const isActive = activeCell === cellId
-                    const cellData = getCellDisplay(rowIndex + 1, col)
-                    
-                    return (
-                      <td
-                        key={cellId}
-                        className={`border border-border relative p-1 h-8 w-24`}
-                        onClick={() => handleCellClick(cellId)}
-                        onDoubleClick={() => handleCellDoubleClick(cellId)}
-                        style={{
-                          ...(isActive ? {
-                            boxShadow: 'inset 0 0 0 2px black',
-                            padding: '1px',
-                            zIndex: 1
-                          } : {})
-                        }}
-                      >
-                        {isActive ? (
-                          <Input
-                            ref={activeCellRef}
-                            value={editValue}
-                            onChange={handleCellChange}
-                            onBlur={handleCellBlur}
-                            onKeyDown={(e) => handleKeyDown(e, cellId)}
-                            className="h-full w-full border-0 focus-visible:ring-0 p-1 absolute inset-0 bg-transparent"
-                            autoFocus
-                          />
-                        ) : (
-                          renderCellContent(cellData)
-                        )}
-                      </td>
-                    )
-                  })}
+                  {getDisplayColumns().map((col) => renderCell(rowIndex + 1, getColumnIndex(col)))}
                 </tr>
               ))}
             </tbody>
@@ -1290,7 +1633,6 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
                 if (activeSheetId !== sheet.id) {
                   setActiveSheetId(sheet.id);
                   setActiveCell(null);
-                  setEditValue("");
                 }
               }}
               onDoubleClick={() => startRenameSheet(sheet.id)}
@@ -1336,5 +1678,5 @@ export default function SpreadsheetComponent({ onDataUpdate, onExport, onFormatF
         </div>
       </div>
     </div>
-  )
-} 
+  );
+}

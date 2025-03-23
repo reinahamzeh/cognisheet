@@ -6,7 +6,7 @@ import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Separator } from "./ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
-import { ActivityIcon as Function, BarChart3, Upload, Sun, Moon, Download, Grid, Home } from "lucide-react"
+import { ActivityIcon as Function, BarChart3, Upload, Sun, Moon, Download, Grid, Home, Sparkles } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu"
 import Link from "next/link"
 
@@ -123,8 +123,12 @@ export default function TopNavbar({
         )}
       </div>
 
-      {/* Right section - Theme toggle and user */}
+      {/* Right section - Pro Features, Theme toggle and user */}
       <div className="flex items-center space-x-2">
+        <Button variant="ghost" size="sm" className="flex items-center">
+          <Sparkles className="h-4 w-4 mr-1 text-amber-500" />
+          <span>Pro Features</span>
+        </Button>
         <Button
           variant="ghost"
           size="icon"
