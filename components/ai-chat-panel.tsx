@@ -73,6 +73,8 @@ export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  // Track active cell references for the current input
+  const [activeCellReferences, setActiveCellReferences] = useState<string[]>([])
   
   // Use Recoil state for chat focus and selected cell range
   const [isChatFocused, setIsChatFocused] = useRecoilState(isChatFocusedState)
@@ -96,30 +98,17 @@ export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
     // 2. We have a new range
     // 3. The Cmd+K trigger has been activated
     if (recoilSelectedCellRange && isChatFocused && cmdKTriggered) {
-      // Get current cursor position in the input
-      const cursorPosition = inputRef.current?.selectionStart || input.length;
-      
-      // Create the formatted cell reference
-      const cellReference = `${recoilSelectedCellRange}`;
-      
-      // Insert the cell reference at cursor position while preserving text before and after
-      const newText = input.substring(0, cursorPosition) + 
-                      cellReference + 
-                      input.substring(cursorPosition);
-      
-      // Update the input with the cell reference inserted at the cursor position
-      setInput(newText);
-      
-      // Ensure focus remains in the chat input
-      inputRef.current?.focus();
-      
-      // Set cursor position to after the inserted cell reference
-      setTimeout(() => {
-        if (inputRef.current) {
-          const newPosition = cursorPosition + cellReference.length;
-          inputRef.current.setSelectionRange(newPosition, newPosition);
+      // Add the cell reference to the active references
+      setActiveCellReferences(prev => {
+        // Don't add duplicate references
+        if (!prev.includes(recoilSelectedCellRange)) {
+          return [...prev, recoilSelectedCellRange];
         }
-      }, 10);
+        return prev;
+      });
+      
+      // Focus the chat input
+      inputRef.current?.focus();
     }
   }, [recoilSelectedCellRange, isChatFocused, cmdKTriggered]);
 
@@ -153,19 +142,25 @@ export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
 
   // Handle sending a message
   const handleSendMessage = () => {
-    if (!input.trim()) return
+    if (!input.trim() && activeCellReferences.length === 0) return
 
-    // Add user message
+    // Add user message with cell references
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: "user",
       content: input,
       timestamp: new Date().toISOString(),
       isEditing: false,
+      cellReferences: activeCellReferences.map(range => ({
+        range,
+        // In a real implementation, you would get the actual cell data here
+        data: {}
+      }))
     }
 
     setMessages((prev) => [...prev, userMessage])
     setInput("")
+    setActiveCellReferences([]) // Clear active references after sending
     setIsLoading(true)
 
     // Simulate AI response after a delay
@@ -176,11 +171,11 @@ export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
         content: "I'll help analyze the data from the selected cells. Let me process that for you...",
         timestamp: new Date().toISOString(),
         isEditing: false,
-        cellReferences: recoilSelectedCellRange ? [{
-          range: recoilSelectedCellRange,
+        cellReferences: activeCellReferences.map(range => ({
+          range,
           // In a real implementation, you would get the actual cell data here
           data: {}
-        }] : undefined
+        }))
       }
 
       setMessages((prev) => [...prev, aiMessage])
@@ -304,6 +299,11 @@ export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
   const handleDeleteChat = (id: string) => {
     console.log(`Deleting chat ${id}`)
     // In a real app, this would delete the chat from a database
+  }
+
+  // Remove a cell reference
+  const handleRemoveCellReference = (range: string) => {
+    setActiveCellReferences(prev => prev.filter(ref => ref !== range));
   }
 
   return (
@@ -513,24 +513,50 @@ export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
       )}
 
       {/* Input Area */}
-      <div className="p-3 border-t flex items-center gap-2">
-        <Input
-          placeholder="Ask anything about your spreadsheet data..."
-          value={input}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          onFocus={handleInputFocus}
-          onBlur={handleInputBlur}
-          className="flex-1 ai-chat-input"
-          ref={inputRef}
-        />
-        <Button
-          size="icon"
-          disabled={!input.trim() || isLoading}
-          onClick={handleSendMessage}
-        >
-          <Send className={`h-4 w-4 ${isLoading ? "opacity-50" : ""}`} />
-        </Button>
+      <div>
+        {/* Active Cell References */}
+        {activeCellReferences.length > 0 && (
+          <div className="px-3 pt-3 pb-0 flex flex-wrap gap-2 items-center">
+            {activeCellReferences.map((range, index) => (
+              <div 
+                key={index}
+                className="flex items-center gap-2 bg-gray-200 dark:bg-gray-800 rounded-md overflow-hidden"
+              >
+                <div className="px-2 py-1 bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                  @
+                </div>
+                <div className="pr-2 pl-1 py-1 text-sm font-mono">
+                  {range}
+                </div>
+                <button 
+                  className="p-1 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
+                  onClick={() => handleRemoveCellReference(range)}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="p-3 border-t flex items-center gap-2">
+          <Input
+            placeholder="Ask anything about your spreadsheet data..."
+            value={input}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            className="flex-1 ai-chat-input"
+            ref={inputRef}
+          />
+          <Button
+            size="icon"
+            disabled={(!input.trim() && activeCellReferences.length === 0) || isLoading}
+            onClick={handleSendMessage}
+          >
+            <Send className={`h-4 w-4 ${isLoading ? "opacity-50" : ""}`} />
+          </Button>
+        </div>
       </div>
     </div>
   )
