@@ -516,41 +516,44 @@ export default function SpreadsheetComponent({
 
   // Update handleCellClick to completely separate spreadsheet and chat functionality
   const handleCellClick = (cellId: string, forceEdit = false) => {
-    // Always update selection and active cell on single click
-    setSelectedCells([cellId]);
-    setActiveCell(cellId);
-    
-    // Get cell data and update formula bar for consistency
-    const cellData = activeSheet.cells[cellId] || { value: '', isBold: false, isItalic: false, textAlign: 'left', wrapText: false };
-    const cellValue = cellData.value || '';
-    setFormulaValue(cellValue);
-    setEditValue(cellValue);
-    
-    // Only enter edit mode if forced (e.g., double-click) or if user clicks an already selected cell
-    if (forceEdit) {
+    // Only take action if the cell is different from the active cell or forceEdit is true
+    if (cellId !== activeCell || forceEdit) {
+      // Always update selection and active cell on single click
+      setSelectedCells([cellId]);
+      setActiveCell(cellId);
+      
+      // Get cell data and update formula bar for consistency
+      const cellData = activeSheet.cells[cellId] || { value: '', isBold: false, isItalic: false, textAlign: 'left', wrapText: false };
+      const cellValue = cellData.value || '';
+      setFormulaValue(cellValue);
+      setEditValue(cellValue);
+      
+      // Only enter edit mode if forced (e.g., double-click) or if user clicks an already selected cell
+      if (forceEdit) {
+        setIsEditing(true);
+        // Focus on the cell after a short delay
+        setTimeout(() => {
+          if (activeCellRef.current) {
+            activeCellRef.current.focus();
+          }
+        }, 10);
+      } else {
+        // For single click, just select but don't edit
+        setIsEditing(false);
+      }
+      
+      // Make sure the table gets focus for keyboard navigation
+      if (tableRef.current && !isEditing) {
+        tableRef.current.focus();
+      }
+    } else if (cellId === activeCell && !isEditing) {
+      // If clicking on the already active cell, enter edit mode
       setIsEditing(true);
-      // Focus on the cell after a short delay
       setTimeout(() => {
         if (activeCellRef.current) {
           activeCellRef.current.focus();
         }
-      }, 0);
-    } else {
-      // For single click, just select but don't edit
-      setIsEditing(false);
-    }
-    
-    // Extract column name and row number correctly
-    // Match column letters and row numbers with regex
-    const match = cellId.match(/([A-Z]+)(\d+)/);
-    if (match) {
-      const colName = match[1];
-      const row = parseInt(match[2]);
-      const colIndex = getColumnIndex(colName);
-      
-      // Check if we need to add more rows or columns
-      addRowsIfNeeded(row);
-      addColumnsIfNeeded(colIndex);
+      }, 10);
     }
   }
 
@@ -1541,10 +1544,15 @@ export default function SpreadsheetComponent({
   // Add mousedown handler to improve cell selection and editing
   const handleCellMouseDown = (e: React.MouseEvent, cellId: string) => {
     // Prevent default to avoid losing focus
-    e.preventDefault()
+    e.preventDefault();
     
     // Handle selection start for dragging
-    handleSelectionStart(cellId)
+    handleSelectionStart(cellId);
+    
+    // Make sure the table has focus for keyboard events
+    if (tableRef.current) {
+      tableRef.current.focus();
+    }
   }
 
   // Render a single cell
@@ -1561,7 +1569,7 @@ export default function SpreadsheetComponent({
     
     // Determine whether cell is hovered
     const isHovered = hoveredCell === cellId
-    
+   
     return (
       <td
         key={cellId}
@@ -1571,22 +1579,30 @@ export default function SpreadsheetComponent({
           transition-colors
           ${isSelected ? 'bg-blue-100' : ''}
           ${isInSelectedRange ? 'bg-blue-50' : ''}
-          ${isHovered ? 'bg-gray-50' : ''}
+          ${isHovered && !isActive ? 'bg-gray-50' : ''}
+          ${!isActive && !isSelected && !isInSelectedRange && !isHovered ? 'hover:bg-gray-50' : ''}
+          cursor-cell
         `}
         onClick={(e) => {
-          e.stopPropagation() // Prevent event bubbling
-          handleCellClick(cellId)
+          e.stopPropagation(); // Prevent event bubbling
+          handleCellClick(cellId);
         }}
         onMouseDown={(e) => handleCellMouseDown(e, cellId)}
         onMouseEnter={() => {
           // Handle both selection move and hover state
-          if (isSelecting) handleSelectionMove(cellId)
-          setHoveredCell(cellId)
+          if (isSelecting) handleSelectionMove(cellId);
+          setHoveredCell(cellId);
         }}
-        onMouseUp={() => isSelecting && handleSelectionEnd()}
+        onMouseUp={() => {
+          if (isSelecting) {
+            handleSelectionEnd();
+            // Ensure the clicked cell becomes active
+            setActiveCell(cellId);
+          }
+        }}
         onDoubleClick={(e) => {
-          e.stopPropagation() // Prevent event bubbling
-          handleCellDoubleClick(cellId)
+          e.stopPropagation(); // Prevent event bubbling
+          handleCellDoubleClick(cellId);
         }}
         onMouseLeave={() => setHoveredCell(null)}
       >
@@ -1613,7 +1629,7 @@ export default function SpreadsheetComponent({
             />
           ) : (
             <div 
-              className="h-full w-full overflow-hidden p-1 cursor-default"
+              className="h-full w-full overflow-hidden p-1 cursor-cell"
               dangerouslySetInnerHTML={{ __html: renderCellContent(cellData) }}
             />
           )}
@@ -1637,64 +1653,149 @@ export default function SpreadsheetComponent({
     }
   }, [isEditing, activeCell])
 
-  // Add an effect to handle keyboard shortcuts for starting edit mode
-  useEffect(() => {
-    const handleTableKeydown = (e: KeyboardEvent) => {
-      // Don't handle events if focus is in the chat input
-      const chatElements = document.querySelectorAll('.ai-chat-panel, .ai-chat-input');
-      for (const el of chatElements) {
-        if (el.contains(document.activeElement)) {
-          return;
-        }
-      }
-
-      // Only handle keyboard events when there's an active cell and we're not already editing
-      if (activeCell && !isEditing) {
-        // If user types any printable character when a cell is selected, enter edit mode
-        // and start with that character
-        if (
-          e.key.length === 1 && 
-          !e.ctrlKey && 
-          !e.metaKey && 
-          !e.altKey &&
-          !e.shiftKey && // Don't trigger on shift keys
-          document.activeElement === tableRef.current
-        ) {
-          e.preventDefault()
-          setIsEditing(true)
-          setEditValue(e.key)
-          setFormulaValue(e.key)
-          
-          // Focus will happen through the useLayoutEffect
-        }
-        // If user presses F2, enter edit mode with current content
-        else if (e.key === 'F2') {
-          e.preventDefault()
-          setIsEditing(true)
-        }
-      }
+  // Update the keyboard navigation handling to ensure proper arrow key behavior
+  const handleTableKeydown = (e: KeyboardEvent) => {
+    // If we're inside an input that isn't part of the spreadsheet, ignore
+    if (
+      document.activeElement instanceof HTMLInputElement && 
+      document.activeElement !== activeCellRef.current &&
+      document.activeElement !== formulaInputRef.current
+    ) {
+      return;
     }
     
-    // Make the table focusable
-    if (tableRef.current) {
-      tableRef.current.tabIndex = 0
-      tableRef.current.addEventListener('keydown', handleTableKeydown)
+    // Don't handle keys when editing a cell
+    if (isEditing) {
+      return;
     }
     
-    return () => {
-      if (tableRef.current) {
-        tableRef.current.removeEventListener('keydown', handleTableKeydown)
+    // For arrow keys, we need an active cell to navigate from
+    // If there's no active cell, select A1
+    if ((!activeCell || selectedCells.length === 0) && 
+        (e.key === 'ArrowUp' || e.key === 'ArrowDown' || 
+         e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      const defaultCell = 'A1';
+      setActiveCell(defaultCell);
+      setSelectedCells([defaultCell]);
+      setHoveredCell(defaultCell);
+      return;
+    }
+    
+    if (!activeCell) return;
+    
+    // Get the current cell coordinates
+    const match = activeCell.match(/([A-Z]+)(\d+)/);
+    if (!match) return;
+    
+    const colName = match[1];
+    const row = parseInt(match[2]);
+    const colIndex = getColumnIndex(colName);
+    
+    // Handle arrow keys for navigation
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (row > 1) {
+        const nextCellId = `${colName}${row - 1}`;
+        setActiveCell(nextCellId);
+        setSelectedCells([nextCellId]);
+        setHoveredCell(nextCellId);
+        setFormulaValue(activeSheet.cells[nextCellId]?.value || "");
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const nextCellId = `${colName}${row + 1}`;
+      setActiveCell(nextCellId);
+      setSelectedCells([nextCellId]);
+      setHoveredCell(nextCellId);
+      setFormulaValue(activeSheet.cells[nextCellId]?.value || "");
+      
+      // Check if we need to add more rows
+      addRowsIfNeeded(row + 1);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      if (colIndex > 0) {
+        const nextCol = getColumnName(colIndex - 1);
+        const nextCellId = `${nextCol}${row}`;
+        setActiveCell(nextCellId);
+        setSelectedCells([nextCellId]);
+        setHoveredCell(nextCellId);
+        setFormulaValue(activeSheet.cells[nextCellId]?.value || "");
+      }
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      const nextCol = getColumnName(colIndex + 1);
+      const nextCellId = `${nextCol}${row}`;
+      setActiveCell(nextCellId);
+      setSelectedCells([nextCellId]);
+      setHoveredCell(nextCellId);
+      setFormulaValue(activeSheet.cells[nextCellId]?.value || "");
+      
+      // Check if we need to add more columns
+      addColumnsIfNeeded(colIndex + 1);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      // Enter starts editing the current cell
+      setIsEditing(true);
+      setTimeout(() => {
+        if (activeCellRef.current) {
+          activeCellRef.current.focus();
+        }
+      }, 10);
+    }
+    
+    // Only handle keyboard events when there's an active cell and we're not already editing
+    if (activeCell && !isEditing) {
+      // If user types any printable character when a cell is selected, enter edit mode
+      // and start with that character
+      if (
+        e.key.length === 1 && 
+        !e.ctrlKey && 
+        !e.metaKey && 
+        !e.altKey &&
+        !e.shiftKey // Don't trigger on shift keys
+      ) {
+        e.preventDefault();
+        setIsEditing(true);
+        setEditValue(e.key);
+        setFormulaValue(e.key);
+        
+        // Focus will happen through the useLayoutEffect
+        setTimeout(() => {
+          if (activeCellRef.current) {
+            activeCellRef.current.focus();
+          }
+        }, 10);
+      }
+      // If user presses F2, enter edit mode with current content
+      else if (e.key === 'F2') {
+        e.preventDefault();
+        setIsEditing(true);
+        setTimeout(() => {
+          if (activeCellRef.current) {
+            activeCellRef.current.focus();
+          }
+        }, 10);
       }
     }
-  }, [activeCell, isEditing])
+  }
 
   // Enhance the table event handling to ensure it can receive keyboard focus
   useEffect(() => {
     if (tableRef.current) {
       // Make sure the table can receive focus
-      tableRef.current.tabIndex = 0
+      tableRef.current.tabIndex = 0;
+      tableRef.current.addEventListener('keydown', handleTableKeydown);
+      
+      // Ensure table has focus on component mount
+      tableRef.current.focus();
     }
-  }, [])
+    
+    return () => {
+      if (tableRef.current) {
+        tableRef.current.removeEventListener('keydown', handleTableKeydown);
+      }
+    }
+  }, [activeCell, activeSheet, isEditing, selectedCells]);
 
   return (
     <div className="flex flex-col h-full spreadsheet-container" tabIndex={0}>
