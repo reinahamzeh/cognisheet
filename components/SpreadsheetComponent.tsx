@@ -21,7 +21,7 @@ interface SpreadsheetComponentProps {
   onDataUpdate?: (data: { sheets: SheetTab[], activeSheetId: string }) => void
   onExport?: (exportFn: () => void) => void
   onFormatFunctions?: (functions: FormatFunctions) => void
-  onCellSelection?: (selectedRange: string) => void
+  onCellSelection?: (selectedRange: string, cellData: { [key: string]: CellData }) => void
 }
 
 interface CellData {
@@ -1314,7 +1314,7 @@ export default function SpreadsheetComponent({
         rangeDescription = `${topLeft}:${bottomRight}`
       }
       
-      onCellSelection(rangeDescription)
+      onCellSelection(rangeDescription, activeSheet.cells)
     }
   }
 
@@ -1401,21 +1401,32 @@ export default function SpreadsheetComponent({
       if (chatInput && (selectedCells.length > 0 || activeCell)) {
         // Generate the range string here, rather than relying on automatic updates
         let range = "";
+        let cellData: { [key: string]: CellData } = {};
         
         if (selectedCells.length > 1) {
           // Format as a range: first:last
           range = `${selectedCells[0]}:${selectedCells[selectedCells.length - 1]}`;
+          
+          // Collect data for all selected cells
+          selectedCells.forEach(cellId => {
+            if (activeSheet.cells[cellId]) {
+              cellData[cellId] = activeSheet.cells[cellId];
+            }
+          });
         } else if (activeCell) {
           // Single cell reference
           range = activeCell;
+          if (activeSheet.cells[activeCell]) {
+            cellData[activeCell] = activeSheet.cells[activeCell];
+          }
         }
         
         // Only now update the selected cell range in Recoil state
         setRecoilSelectedCellRange(range);
         
         if (onCellSelection) {
-          // Send the selected range to the chat
-          onCellSelection(range);
+          // Send the selected range and cell data to the chat
+          onCellSelection(range, cellData);
           
           // Focus the chat input
           setTimeout(() => {

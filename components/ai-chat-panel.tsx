@@ -7,6 +7,7 @@ import { Input } from "./ui/input"
 import { Send, User, PlusCircle, History, Brain, Edit, X, BarChart3, TableProperties, Globe, Check, StopCircle } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu"
 import { selectedCellRangeState, isChatFocusedState, isChatOpenState, cmdKTriggeredState } from "../atoms/spreadsheetAtoms"
+import { CellReference } from "./ui/CellReference"
 
 // Define props interface
 interface AIChatPanelProps {
@@ -14,7 +15,7 @@ interface AIChatPanelProps {
 }
 
 // Sample chat messages for demonstration
-const initialMessages = [
+const initialMessages: ChatMessage[] = [
   {
     id: "1",
     role: "assistant",
@@ -39,8 +40,30 @@ const suggestedPrompts = [
   { id: "web", text: "Web Search", icon: <Globe className="h-3 w-3 mr-1" /> },
 ]
 
+// Add new interface for cell data
+interface CellData {
+  value: string
+  isBold: boolean
+  isItalic: boolean
+  textAlign: 'left' | 'center' | 'right'
+  wrapText: boolean
+}
+
+// Add new interface for message with cell references
+interface ChatMessage {
+  id: string
+  role: "user" | "assistant"
+  content: string
+  timestamp: string
+  isEditing: boolean
+  cellReferences?: {
+    range: string
+    data?: { [key: string]: CellData }
+  }[]
+}
+
 export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
-  const [messages, setMessages] = useState(initialMessages)
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [showChatHistory, setShowChatHistory] = useState(false)
@@ -133,7 +156,7 @@ export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
     if (!input.trim()) return
 
     // Add user message
-    const userMessage = {
+    const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: "user",
       content: input,
@@ -147,25 +170,20 @@ export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
 
     // Simulate AI response after a delay
     setTimeout(() => {
-      // Responses that don't suggest automatic analysis
-      const aiResponses = [
-        "I can help with that! Let me know which specific cells you'd like me to work with by using Cmd+K to select them or by describing the data range.",
-        "I'd be happy to help. To create a chart, I'll need you to select the data range you want to visualize using Cmd+K, or you can describe which cells to use.",
-        "If you'd like me to apply formatting, please select the cells and use Cmd+K, or specify which range you need formatted.",
-        "I can help with that! For date calculations, please let me know which specific dates you're working with by selecting them or describing where they are in your spreadsheet.",
-      ]
-
-      const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)]
-
-      const assistantMessage = {
+      const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: randomResponse,
+        content: "I'll help analyze the data from the selected cells. Let me process that for you...",
         timestamp: new Date().toISOString(),
         isEditing: false,
+        cellReferences: recoilSelectedCellRange ? [{
+          range: recoilSelectedCellRange,
+          // In a real implementation, you would get the actual cell data here
+          data: {}
+        }] : undefined
       }
 
-      setMessages((prev) => [...prev, assistantMessage])
+      setMessages((prev) => [...prev, aiMessage])
       setIsLoading(false)
     }, 1500)
   }
@@ -420,7 +438,19 @@ export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
                 </div>
               ) : (
                 <div className="relative group">
-                  <div className="text-sm whitespace-pre-wrap break-words">{message.content}</div>
+                  <div className="text-sm whitespace-pre-wrap break-words">
+                    {message.content}
+                    {message.cellReferences?.map((ref, index) => (
+                      <React.Fragment key={index}>
+                        {" "}
+                        <CellReference 
+                          range={ref.range} 
+                          data={ref.data}
+                          className={message.role === "user" ? "bg-primary-foreground/10" : undefined}
+                        />
+                      </React.Fragment>
+                    ))}
+                  </div>
                   <div className="text-xs text-muted-foreground mt-1">
                     {formatTime(message.timestamp)}
                   </div>
