@@ -15,7 +15,7 @@ import { ChatHistoryProvider } from './context/ChatHistoryContext';
 const LandingPage = dynamic(() => import('./components/LandingPage'), { ssr: false });
 const SpreadsheetView = dynamic(() => import('./components/SpreadsheetView'), { ssr: false });
 const ChatPanel = dynamic(() => import('./components/ChatPanel'), { ssr: false });
-const Header = dynamic(() => import('./components/Header'), { ssr: false });
+const Header = dynamic(() => import('./components/header'), { ssr: false });
 const NewChatInterface = dynamic(() => import('./components/NewChatInterface'), { ssr: false });
 const EnhancedSpreadsheetApp = dynamic(() => import('./components/EnhancedSpreadsheetApp') as any, { ssr: false });
 
@@ -88,7 +88,6 @@ const AppContent: React.FC<AppContentProps> = ({
   onWatchDemo 
 }) => {
   const { selectedRange } = useSpreadsheet();
-  const { setInputValue } = useChat();
   const { data: spreadsheetDataContext } = useSpreadsheet();
   const [view, setView] = useState<'landing' | 'spreadsheet'>('landing');
 
@@ -104,9 +103,9 @@ const AppContent: React.FC<AppContentProps> = ({
 
     if (isCmdK && selectedRange) {
       event.preventDefault();
-      setInputValue(`${selectedRange} `);
+      // setInputValue(`${selectedRange} `);
     }
-  }, [selectedRange, setInputValue]);
+  }, [selectedRange]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
