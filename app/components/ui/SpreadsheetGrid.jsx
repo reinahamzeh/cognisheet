@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react"
 import { cn } from "../../lib/utils"
 import { evaluateFormula } from '../../lib/formulaEvaluator'
+import { useChat } from '../../context/ChatContext'
 
 /**
  * SpreadsheetGrid component that displays and manages the spreadsheet data
@@ -22,6 +23,9 @@ export function SpreadsheetGrid({ activeTabId, spreadsheetData, onCellChange }) 
   const [hoveredRow, setHoveredRow] = useState(null)
   const [hoveredCol, setHoveredCol] = useState(null)
   const [cellFormat, setCellFormat] = useState({})
+  
+  // Get chat context
+  const { insertRangeToken } = useChat()
   
   // Ref for the input field
   const inputRef = useRef(null)
@@ -245,28 +249,88 @@ export function SpreadsheetGrid({ activeTabId, spreadsheetData, onCellChange }) 
   // Add event listener for keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Check for Cmd/Ctrl + K
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        console.log("Cmd+K pressed"); // Step 1: Log detection
+
+        // Check if cells are selected
+        if (!selectionStart || !selectionEnd) {
+          // console.log('Cmd+K ignored: No cells selected');
+          return;
+        }
+
+        // Check if focus is on chat input or cell editor input
+        const chatInputElement = document.querySelector('#chat-input');
+        const cellEditorInput = inputRef.current; // Ref to the cell editing input
+        const activeElement = document.activeElement;
+
+        if (activeElement === chatInputElement || activeElement === cellEditorInput) {
+          // console.log('Cmd+K ignored: Chat input or cell editor focused');
+          return; // Don't interfere if user is typing in chat or editing a cell
+        }
+
+        // If checks pass, proceed
+        console.log('Cmd+K triggered: Inserting cell range into chat.'); // Feedback log
+        e.preventDefault();
+
+        const start = selectionStart;
+        const end = selectionEnd;
+
+        // Determine the corners of the selection rectangle
+        const minColNum = Math.min(start.col.charCodeAt(0), end.col.charCodeAt(0));
+        const maxColNum = Math.max(start.col.charCodeAt(0), end.col.charCodeAt(0));
+        const minRow = Math.min(start.row, end.row);
+        const maxRow = Math.max(start.row, end.row);
+
+        const minCol = String.fromCharCode(minColNum);
+        const maxCol = String.fromCharCode(maxColNum);
+
+        let rangeString = '';
+        if (minCol === maxCol && minRow === maxRow) {
+          // Single cell selected
+          rangeString = `${minCol}${minRow}`;
+        } else {
+          // Range selected
+          rangeString = `${minCol}${minRow}:${maxCol}${maxRow}`;
+        }
+
+        console.log("Selected range:", rangeString); // Step 2: Log calculated range
+
+        // --- Call context function to insert the range as a token --- 
+        insertRangeToken(rangeString); // Step 3: Call insertion function
+
+        // Step 5: Add temporary UI log (alert)
+        alert("Inserted: " + rangeString);
+
+        return; // Prevent other shortcuts like Cmd+A
+      }
+
       // Cmd+A to select all
       if ((e.metaKey || e.ctrlKey) && e.key === 'a' && !editCell) {
-        e.preventDefault()
-        if (onCellChange) {
-          onCellChange(null, null, null)
-        }
+        e.preventDefault();
+        // Logic for selecting all cells - determine max row/col dynamically if possible
+        // For now, assuming fixed range based on headers, or needs adjustment
+        const maxCol = columnHeaders[columnHeaders.length - 1];
+        const maxRow = rowHeaders[rowHeaders.length - 1];
+        setSelectionStart({ col: 'A', row: 1 });
+        setSelectionEnd({ col: maxCol, row: maxRow });
       }
-      
-      // Cmd+K (keep existing behavior)
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k' && !editCell) {
-        e.preventDefault()
-      }
-    }
+    };
     
-    document.addEventListener('keydown', handleKeyDown)
-    document.addEventListener('mouseup', handleMouseUp)
+    // Attach listener globally to the document
+    document.addEventListener('keydown', handleKeyDown);
+    // Global mouseup listener remains necessary for selection logic
+    document.addEventListener('mouseup', handleMouseUp); 
     
     return () => {
-      document.removeEventListener('keydown', handleKeyDown)
-      document.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [editCell, onCellChange])
+      // Remove global listeners on cleanup
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+    // Removed onCellChange from dependencies as it's not directly used in this effect's logic
+    // Added columnHeaders, rowHeaders because Cmd+A logic uses them
+    // Added inputRef to dependencies because the focus check uses it
+  }, [editCell, selectionStart, selectionEnd, insertRangeToken, columnHeaders, rowHeaders, handleMouseUp, inputRef]); 
   
   return (
     <div className="flex-1 overflow-hidden relative">
@@ -277,6 +341,8 @@ export function SpreadsheetGrid({ activeTabId, spreadsheetData, onCellChange }) 
           width: '100%',
           maxWidth: '1000px' // 26 columns at 40px each
         }}
+        onMouseUp={handleMouseUp}
+        tabIndex={0}
       >
         <table className="border-collapse">
           <colgroup>

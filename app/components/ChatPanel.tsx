@@ -4,33 +4,90 @@ import { useChat } from '../context/ChatContext';
 import ChartDisplay from './ChartDisplay';
 import { useSpreadsheet } from '../context/SpreadsheetContext';
 
+interface Message {
+  type: 'user' | 'error' | 'system' | 'formula' | 'assistant';
+  content: string;
+  chart?: any; // Replace with proper chart type when available
+  researchResults?: string[];
+  suggestedFormula?: string;
+}
+
+interface Theme {
+  colors: {
+    primary: string;
+    background: string;
+    text: string;
+    accent: string;
+    error: string;
+    border: string;
+    surface: string;
+    muted: string;
+  };
+  spacing: {
+    base: string;
+    xs: string;
+    sm: string;
+    md: string;
+    lg: string;
+    xl: string;
+    xxl: string;
+  };
+  typography: {
+    fontFamily: string;
+    fontSize: {
+      small: string;
+      base: string;
+      large: string;
+      h1: string;
+      h2: string;
+      h3: string;
+    };
+  };
+  borderRadius: {
+    small: string;
+    base: string;
+    large: string;
+    round: string;
+  };
+  shadows: {
+    small: string;
+    base: string;
+    large: string;
+  };
+  transitions: {
+    base: string;
+    fast: string;
+    slow: string;
+  };
+}
+
 const ChatContainer = styled.div`
   display: flex;
   flex-direction: column;
   width: 350px;
-  background-color: ${({ theme }) => theme.colors.white};
-  border-left: 1px solid ${({ theme }) => theme.colors.lightGray};
+  background-color: ${({ theme }) => theme.colors.surface};
+  border-left: 1px solid ${({ theme }) => theme.colors.border};
   box-shadow: ${({ theme }) => theme.shadows.small};
 `;
 
 const ChatHeader = styled.div`
   padding: ${({ theme }) => theme.spacing.base};
-  border-bottom: 1px solid ${({ theme }) => theme.colors.lightGray};
+  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
   display: flex;
   justify-content: space-between;
   align-items: center;
   background-color: ${({ theme }) => theme.colors.primary};
   
   h2 {
-    font-size: ${({ theme }) => theme.fontSizes.h2};
+    font-size: ${({ theme }) => theme.typography.fontSize.h2};
     margin: 0;
-    color: ${({ theme }) => theme.colors.white};
+    color: ${({ theme }) => theme.colors.surface};
   }
 `;
 
 const ClearButton = styled.button`
-  font-size: ${({ theme }) => theme.fontSizes.small};
-  color: ${({ theme }) => theme.colors.white};
+  font-size: ${({ theme }) => theme.typography.fontSize.small};
+  color: ${({ theme }) => theme.colors.surface};
   background: none;
   border: none;
   cursor: pointer;
@@ -50,9 +107,14 @@ const MessagesContainer = styled.div`
   gap: ${({ theme }) => theme.spacing.base};
 `;
 
-const Message = styled.div`
+interface MessageProps {
+  type: Message['type'];
+  theme?: Theme;
+}
+
+const Message = styled.div<MessageProps>`
   padding: ${({ theme }) => theme.spacing.base};
-  border-radius: ${({ theme }) => theme.borderRadius.medium};
+  border-radius: ${({ theme }) => theme.borderRadius.base};
   max-width: 85%;
   
   ${({ type, theme }) => {
@@ -60,7 +122,7 @@ const Message = styled.div`
       return `
         align-self: flex-end;
         background-color: ${theme.colors.primary};
-        color: ${theme.colors.white};
+        color: ${theme.colors.surface};
       `;
     } else if (type === 'error') {
       return `
@@ -72,11 +134,11 @@ const Message = styled.div`
     } else if (type === 'system') {
       return `
         align-self: center;
-        background-color: ${theme.colors.lightGray}80;
+        background-color: ${theme.colors.muted}80;
         color: ${theme.colors.text};
         font-style: italic;
         font-size: 0.9em;
-        padding: ${theme.spacing.small};
+        padding: ${theme.spacing.sm};
       `;
     } else if (type === 'formula') {
       return `
@@ -89,9 +151,9 @@ const Message = styled.div`
     } else {
       return `
         align-self: flex-start;
-        background-color: ${theme.colors.lightGray};
+        background-color: ${theme.colors.muted};
         color: ${theme.colors.text};
-        border: 1px solid ${theme.colors.lightGray};
+        border: 1px solid ${theme.colors.border};
       `;
     }
   }}
@@ -99,17 +161,17 @@ const Message = styled.div`
 
 const InputContainer = styled.div`
   padding: ${({ theme }) => theme.spacing.base};
-  border-top: 1px solid ${({ theme }) => theme.colors.lightGray};
+  border-top: 1px solid ${({ theme }) => theme.colors.border};
   display: flex;
-  gap: ${({ theme }) => theme.spacing.small};
+  gap: ${({ theme }) => theme.spacing.sm};
 `;
 
 const Input = styled.input`
   flex: 1;
-  padding: ${({ theme }) => theme.spacing.small};
-  background-color: ${({ theme }) => theme.colors.white};
+  padding: ${({ theme }) => theme.spacing.sm};
+  background-color: ${({ theme }) => theme.colors.surface};
   color: ${({ theme }) => theme.colors.text};
-  border: 1px solid ${({ theme }) => theme.colors.lightGray};
+  border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: ${({ theme }) => theme.borderRadius.small};
   
   &:focus {
@@ -125,9 +187,9 @@ const Input = styled.input`
 `;
 
 const SendButton = styled.button`
-  padding: ${({ theme }) => `${theme.spacing.small} ${theme.spacing.base}`};
+  padding: ${({ theme }) => `${theme.spacing.sm} ${theme.spacing.base}`};
   background-color: ${({ theme }) => theme.colors.primary};
-  color: ${({ theme }) => theme.colors.white};
+  color: ${({ theme }) => theme.colors.surface};
   border: none;
   border-radius: ${({ theme }) => theme.borderRadius.small};
   cursor: pointer;
@@ -163,17 +225,17 @@ const EmptyState = styled.div`
     margin-bottom: ${({ theme }) => theme.spacing.base};
     
     li {
-      margin-bottom: ${({ theme }) => theme.spacing.small};
+      margin-bottom: ${({ theme }) => theme.spacing.sm};
     }
   }
 `;
 
 const FormulaButton = styled.button`
   display: block;
-  margin-top: ${({ theme }) => theme.spacing.small};
-  padding: ${({ theme }) => theme.spacing.small};
+  margin-top: ${({ theme }) => theme.spacing.sm};
+  padding: ${({ theme }) => theme.spacing.sm};
   background-color: ${({ theme }) => theme.colors.accent};
-  color: ${({ theme }) => theme.colors.white};
+  color: ${({ theme }) => theme.colors.surface};
   border: none;
   border-radius: ${({ theme }) => theme.borderRadius.small};
   cursor: pointer;
@@ -185,14 +247,14 @@ const FormulaButton = styled.button`
 `;
 
 const ResearchResult = styled.div`
-  margin-top: ${({ theme }) => theme.spacing.small};
-  padding: ${({ theme }) => theme.spacing.small};
-  background-color: ${({ theme }) => theme.colors.lightGray}30;
+  margin-top: ${({ theme }) => theme.spacing.sm};
+  padding: ${({ theme }) => theme.spacing.sm};
+  background-color: ${({ theme }) => theme.colors.muted}30;
   border-radius: ${({ theme }) => theme.borderRadius.small};
   font-size: 0.9em;
 `;
 
-const ChatPanel = () => {
+const ChatPanel: React.FC = () => {
   const { 
     messages, 
     inputValue, 
@@ -202,8 +264,8 @@ const ChatPanel = () => {
     isProcessing
   } = useChat();
   const { updateCell } = useSpreadsheet();
-  const messagesEndRef = useRef(null);
-  const inputRef = useRef(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -216,7 +278,7 @@ const ChatPanel = () => {
   }, []);
   
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (inputValue.trim() && !isProcessing) {
       sendMessage(inputValue);
@@ -224,7 +286,7 @@ const ChatPanel = () => {
   };
   
   // Handle applying a formula to the selected range
-  const handleApplyFormula = (formula) => {
+  const handleApplyFormula = (formula: string) => {
     if (updateCell && formula) {
       // Extract the range from the formula (e.g., "=SUM(A1:B5)" -> "A1:B5")
       const rangeMatch = formula.match(/\(([A-Z][0-9]+:[A-Z][0-9]+)\)/);
@@ -251,83 +313,50 @@ const ChatPanel = () => {
       <MessagesContainer>
         {messages.length === 0 ? (
           <EmptyState>
-            <p>Ask questions about your spreadsheet data:</p>
+            <p>Welcome! I'm your AI assistant. Here's what I can help you with:</p>
             <ul>
-              <li>Select data and ask "What's the average?"</li>
-              <li>Select two columns and say "Create a bar chart"</li>
-              <li>Try "What's the maximum value in column A?"</li>
-              <li>"Generate a sum formula for this range"</li>
-              <li>"Analyze this data and tell me insights"</li>
-              <li>"Summarize what this spreadsheet contains"</li>
+              <li>Analyze your spreadsheet data</li>
+              <li>Generate charts and visualizations</li>
+              <li>Suggest formulas and calculations</li>
+              <li>Answer questions about your data</li>
+              <li>Provide insights and recommendations</li>
             </ul>
-            <p>Use Cmd+K to quickly select data</p>
+            <p>Type your question or request below to get started!</p>
           </EmptyState>
         ) : (
           messages.map((message, index) => (
-            <React.Fragment key={index}>
-              {message.type === 'chart' ? (
-                <ChartDisplay 
-                  type={message.chartType} 
-                  data={message.data} 
-                  title={message.content} 
-                />
-              ) : message.type === 'formula' ? (
-                <Message type="formula">
-                  {message.content}
-                  <FormulaButton onClick={() => handleApplyFormula(message.formula)}>
-                    Apply Formula
-                  </FormulaButton>
-                </Message>
-              ) : message.type === 'research' ? (
-                <Message type="response">
-                  {message.content}
-                  {message.results && (
-                    <ResearchResult>
-                      {message.results.map((result, idx) => (
-                        <div key={idx}>
-                          <strong>{result.title}</strong>
-                          <p>{result.description}</p>
-                        </div>
-                      ))}
-                    </ResearchResult>
-                  )}
-                </Message>
-              ) : message.type === 'extraction' ? (
-                <Message type="response">
-                  {message.content}
-                  {message.data && (
-                    <ResearchResult>
-                      <p>Extracted {message.data.length} rows of data</p>
-                    </ResearchResult>
-                  )}
-                </Message>
-              ) : (
-                <Message type={message.type}>
-                  {message.content}
-                </Message>
+            <Message key={index} type={message.type}>
+              {message.content}
+              {message.chart && <ChartDisplay data={message.chart} />}
+              {message.researchResults && message.researchResults.map((result, i) => (
+                <ResearchResult key={i}>{result}</ResearchResult>
+              ))}
+              {message.suggestedFormula && (
+                <FormulaButton onClick={() => handleApplyFormula(message.suggestedFormula!)}>
+                  Apply Formula: {message.suggestedFormula}
+                </FormulaButton>
               )}
-            </React.Fragment>
+            </Message>
           ))
         )}
         <div ref={messagesEndRef} />
       </MessagesContainer>
       
-      <InputContainer>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', width: '100%', gap: '8px' }}>
+      <form onSubmit={handleSubmit}>
+        <InputContainer>
           <Input
             ref={inputRef}
-            id="chat-input"
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Ask AI about your data..."
+            placeholder="Ask me anything about your data..."
             disabled={isProcessing}
           />
           <SendButton type="submit" disabled={!inputValue.trim() || isProcessing}>
-            {isProcessing ? '...' : 'Send'}
+            Send
           </SendButton>
-        </form>
-      </InputContainer>
+        </InputContainer>
+      </form>
     </ChatContainer>
   );
 };

@@ -1,4 +1,4 @@
-import { supabase } from '../services/supabase';
+import { supabase } from '../services/supabase.ts';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';

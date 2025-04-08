@@ -381,13 +381,6 @@ export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
         </div>
       )}
 
-      {/* Pro Tip - only show when chat is focused */}
-      {isChatFocused && (
-        <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-xs border-b">
-          <span className="font-medium text-blue-600 dark:text-blue-400">Tip:</span> Select multiple cells and press Cmd+K (or Ctrl+K) to instantly reference them in chat.
-        </div>
-      )}
-
       {/* Messages Area */}
       <div className="flex-1 p-3 overflow-y-auto">
         {messages.map((message) => (
@@ -494,14 +487,19 @@ export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Suggested Prompts - only shown when chat is actively being used */}
-      {isChatFocused && (
-        <div className="p-2 border-t flex flex-wrap gap-1">
+      {/* Always visible Tips and Suggestions - Moved Below Messages Area */}
+      <div className="p-2 border-t border-b bg-muted/50">
+        {/* Pro Tip - Always visible */}
+        <div className="pb-2 text-xs">
+          <span className="font-medium text-blue-600 dark:text-blue-400">Tip:</span> Select multiple cells and press Cmd+K (or Ctrl+K) to instantly reference them in chat.
+        </div>
+        {/* Suggested Prompts - Always visible */}
+        <div className="pt-2 border-t flex flex-wrap gap-1">
           {suggestedPrompts.map((prompt) => (
-            <Button 
-              key={prompt.id} 
-              variant="outline" 
-              size="sm" 
+            <Button
+              key={prompt.id}
+              variant="outline"
+              size="sm"
               className="text-xs h-7"
               onClick={() => handleSuggestedPrompt(prompt.text)}
             >
@@ -510,7 +508,7 @@ export default function AIChatPanel({ selectedCellRange }: AIChatPanelProps) {
             </Button>
           ))}
         </div>
-      )}
+      </div>
 
       {/* Input Area */}
       <div>

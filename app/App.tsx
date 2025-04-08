@@ -1,17 +1,23 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import dynamic from 'next/dynamic';
-import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
+import { Routes, Route } from 'react-router-dom';
 import FileLimitModal from '../components/file-limit-modal';
 import PricingModal from '../components/pricing-modal';
 import { useUser } from '../lib/context/user-context';
+import { SpreadsheetProvider, useSpreadsheet } from './context/spreadsheet-context';
+import { ChatProvider, useChat } from './context/ChatContext';
+import { ChatHistoryProvider } from './context/ChatHistoryContext';
 
-// Dynamic imports for components
+// Dynamic imports - ensure consistent casing for Header
 const LandingPage = dynamic(() => import('./components/LandingPage'), { ssr: false });
 const SpreadsheetView = dynamic(() => import('./components/SpreadsheetView'), { ssr: false });
+const ChatPanel = dynamic(() => import('./components/ChatPanel'), { ssr: false });
+const Header = dynamic(() => import('./components/Header'), { ssr: false });
+const NewChatInterface = dynamic(() => import('./components/NewChatInterface'), { ssr: false });
+const EnhancedSpreadsheetApp = dynamic(() => import('./components/EnhancedSpreadsheetApp') as any, { ssr: false });
 
 const AppContainer = styled.div`
   display: flex;
@@ -20,184 +26,160 @@ const AppContainer = styled.div`
   width: 100vw;
 `;
 
-const App: React.FC = () => {
-  const [view, setView] = useState<'landing' | 'spreadsheet'>('landing');
-  const [spreadsheetData, setSpreadsheetData] = useState<string[][]>([]);
-  const [fileName, setFileName] = useState<string>('');
-  
-  // These should always be false to never show the limit modals
-  const [showFileLimitModal, setShowFileLimitModal] = useState(false)
-  const [showPricingModal, setShowPricingModal] = useState(false)
-  const { incrementFileCount } = useUser();
-
-  const parseCSV = (content: string) => {
-    console.log('Parsing CSV with content length:', content.length);
-    
-    Papa.parse(content, {
-      complete: (results) => {
-        console.log('CSV parsing complete, rows:', results.data.length);
-        
-        if (results.data && results.data.length > 0) {
-          const grid = results.data as string[][];
-          console.log('Grid created with size:', grid.length, 'x', grid[0].length);
-          
-          setSpreadsheetData(grid);
-          setView('spreadsheet');
-        } else {
-          console.error('No data found in the CSV file');
-        }
-      },
-      error: (error) => {
-        console.error('Error parsing CSV:', error);
-      }
-    });
-  };
-
-  const parseExcel = (content: ArrayBuffer) => {
-    console.log('Parsing Excel file with buffer size:', content.byteLength);
-    
-    try {
-      const data = new Uint8Array(content);
-      const workbook = XLSX.read(data, { type: 'array' });
-      
-      // Process all sheets
-      const allSheets: { [key: string]: string[][] } = {};
-      
-      workbook.SheetNames.forEach((sheetName) => {
-        const worksheet = workbook.Sheets[sheetName];
-        
-        // Convert to array format with headers
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
-        
-        if (jsonData && jsonData.length > 0) {
-          // Convert all values to strings and filter out empty rows
-          const grid = jsonData
-            .map(row => row.map(cell => cell !== undefined && cell !== null ? String(cell) : ''))
-            .filter(row => row.some(cell => cell !== '')); // Filter out completely empty rows
-          
-          if (grid.length > 0) {
-            allSheets[sheetName] = grid;
-          }
-        }
-      });
-      
-      // If we have any sheets with data
-      if (Object.keys(allSheets).length > 0) {
-        // For now, use the first sheet (we'll handle multiple sheets in SpreadsheetView)
-        const firstSheetName = Object.keys(allSheets)[0];
-        setSpreadsheetData(allSheets[firstSheetName]);
-        setView('spreadsheet');
-      } else {
-        console.error('No data found in any sheet of the Excel file');
-      }
-    } catch (err) {
-      console.error('Error parsing Excel:', err);
-    }
-  };
-
-  const handleFileUpload = (file: File) => {
-    // No authentication checks - all features enabled for all users
-    console.log('File upload started:', file.name, 'size:', file.size, 'type:', file.type);
-    setFileName(file.name);
-    
-    // File upload is unrestricted, no need to track count
-    console.log('File count not tracked - all features enabled');
-    
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      console.log('File read complete');
-      const content = e.target?.result;
-      
-      if (!content) {
-        console.error('No content read from file');
-        return;
-      }
-      
-      const fileExt = file.name.split('.').pop()?.toLowerCase();
-      console.log('File extension detected:', fileExt);
-      
-      if (fileExt === 'csv') {
-        parseCSV(content as string);
-      } else if (['xls', 'xlsx'].includes(fileExt || '')) {
-        parseExcel(content as ArrayBuffer);
-      } else {
-        console.error('Unsupported file type:', fileExt);
-      }
-    };
-    
-    reader.onerror = (error) => {
-      console.error('Error reading file:', error);
-    };
-    
-    console.log('Starting file read...');
-    if (file.name.endsWith('.csv')) {
-      reader.readAsText(file);
-    } else {
-      reader.readAsArrayBuffer(file);
-    }
-  };
-
-  const handleNewFile = () => {
-    console.log('Creating new file');
-    
-    // Still increment file count for tracking, but no limit check
-    incrementFileCount();
-    
-    // Create an empty grid 10x10
-    const emptyGrid = Array(10).fill(0).map(() => Array(10).fill(''));
-    setSpreadsheetData(emptyGrid);
-    setFileName('New Spreadsheet');
-    setView('spreadsheet');
-  };
-
-  const handleWatchDemo = () => {
-    console.log('Opening demo video');
-    alert('Demo video would play here in the actual implementation');
-  };
-
-  const handleSpreadsheetDataChange = (newData: string[][]) => {
-    console.log('Spreadsheet data changed:', newData.length, 'rows');
-    setSpreadsheetData(newData);
-  };
-
+// Main layout with spreadsheet and chat panel side by side
+const MainLayout: React.FC = () => {
   return (
-    <AppContainer>
-      {view === 'landing' ? (
-        <LandingPage 
-          onUploadFile={handleFileUpload}
-          onNewFile={handleNewFile}
-          onWatchDemo={handleWatchDemo}
-        />
-      ) : (
+    <div className="app-container">
+      <Header />
+      <div className="main-content">
         <SpreadsheetView 
-          data={spreadsheetData} 
-          title={fileName || 'Spreadsheet'}
-          onDataChange={handleSpreadsheetDataChange}
-          // All features enabled for all users
+          title="Spreadsheet"
           enableWebSearch={true}
           enableCharts={true}
           enableMultiCellSelection={true}
           enableDataEnrichment={true}
         />
-      )}
-      
-      {/* Modals are disabled - set to false so they never show */}
-      {false && (
-        <>
-          <FileLimitModal 
-            isOpen={false}
-            onClose={() => {}}
-            onUpgrade={() => {}}
-          />
-          
-          <PricingModal 
-            isOpen={false}
-            onClose={() => {}}
-          />
-        </>
-      )}
-    </AppContainer>
+        <ChatPanel />
+      </div>
+    </div>
+  );
+};
+
+// Enhanced layout with EnhancedSpreadsheetApp
+const EnhancedLayout: React.FC = () => {
+  return (
+    <div className="app-container">
+      <Header />
+      <EnhancedSpreadsheetApp />
+    </div>
+  );
+};
+
+// New chat interface layout
+const NewChatLayout: React.FC = () => {
+  return (
+    <div className="app-container">
+      <Header />
+      <div className="main-content">
+        <SpreadsheetView 
+          title="Spreadsheet"
+          enableWebSearch={true}
+          enableCharts={true}
+          enableMultiCellSelection={true}
+          enableDataEnrichment={true}
+        />
+        <NewChatInterface />
+      </div>
+    </div>
+  );
+};
+
+// Define props for AppContent
+interface AppContentProps {
+  onUploadFile: (file: File) => Promise<boolean>;
+  onNewFile: () => void;
+  onWatchDemo: () => void;
+}
+
+// Wrapper component to access context for the keyboard listener
+const AppContent: React.FC<AppContentProps> = ({ 
+  onUploadFile,
+  onNewFile,
+  onWatchDemo 
+}) => {
+  const { selectedRange } = useSpreadsheet();
+  const { setInputValue } = useChat();
+  const { data: spreadsheetDataContext } = useSpreadsheet();
+  const [view, setView] = useState<'landing' | 'spreadsheet'>('landing');
+
+  useEffect(() => {
+    if (spreadsheetDataContext && spreadsheetDataContext.length > 0) {
+      setView('spreadsheet');
+    }
+  }, [spreadsheetDataContext]);
+
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const isCmdK = (isMac && event.metaKey && event.key === 'k') || (!isMac && event.ctrlKey && event.key === 'k');
+
+    if (isCmdK && selectedRange) {
+      event.preventDefault();
+      setInputValue(`${selectedRange} `);
+    }
+  }, [selectedRange, setInputValue]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleKeyDown]);
+
+  if (view === 'landing') {
+    return (
+      <LandingPage 
+        onUploadFile={onUploadFile}
+        onNewFile={onNewFile}
+        onWatchDemo={onWatchDemo}
+      />
+    );
+  } 
+  
+  return (
+    <Routes>
+      <Route path="/" element={<MainLayout />} />
+      <Route path="/app" element={<MainLayout />} />
+      <Route path="/enhanced" element={<EnhancedLayout />} />
+      <Route path="/new-chat" element={<NewChatLayout />} />
+    </Routes>
+  );
+}
+
+const App: React.FC = () => {
+  const [showFileLimitModal, setShowFileLimitModal] = useState(false);
+  const [showPricingModal, setShowPricingModal] = useState(false);
+  const { incrementFileCount } = useUser();
+  const { handleFileUpload: contextHandleFileUpload } = useSpreadsheet();
+
+  const handleNewFile = useCallback(() => {
+    console.log('Creating new file via context (placeholder)');
+    incrementFileCount();
+  }, [incrementFileCount]);
+
+  const handleWatchDemo = useCallback(() => {
+    console.log('Opening demo video');
+    alert('Demo video would play here');
+  }, []);
+
+  return (
+    <SpreadsheetProvider>
+      <ChatProvider>
+        <ChatHistoryProvider>
+          <AppContainer>
+            <AppContent 
+              onUploadFile={contextHandleFileUpload}
+              onNewFile={handleNewFile}
+              onWatchDemo={handleWatchDemo}
+            /> 
+
+            {/* Modals remain disabled */}
+            {false && (
+              <>
+                <FileLimitModal 
+                  isOpen={false}
+                  onClose={() => {}}
+                  onUpgrade={() => {}}
+                />
+                <PricingModal 
+                  isOpen={false}
+                  onClose={() => {}}
+                />
+              </>
+            )}
+          </AppContainer>
+        </ChatHistoryProvider>
+      </ChatProvider>
+    </SpreadsheetProvider>
   );
 };
 

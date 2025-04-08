@@ -1,131 +1,243 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useSpreadsheet } from "@/context/spreadsheet-context";
-import { useUser } from "@/context/user-context";
-import { Auth } from "@/components/auth";
-import { SavedSpreadsheets } from "@/components/saved-spreadsheets";
-import { getSpreadsheetById } from "@/lib/supabase";
+import React, { useState } from 'react';
+import styled from 'styled-components';
+import { useSpreadsheet } from '../context/SpreadsheetContext';
+import { useUser } from '../context/UserContext';
+import { Auth } from './auth';
+import { SavedSpreadsheets } from './saved-spreadsheets';
+import { getSpreadsheetById } from '../services/supabase';
 
-export function LandingPage() {
-  const { handleFileUpload, loading, setData } = useSpreadsheet();
-  const userContext = useUser();
+interface Spreadsheet {
+  id: string;
+  name?: string;
+  data?: any;
+}
+
+const Container = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 80vh;
+  padding: ${({ theme }) => theme.spacing.lg};
+  text-align: center;
+  background-color: ${({ theme }) => theme.colors.background};
+`;
+
+const Title = styled.h1`
+  font-size: ${({ theme }) => theme.typography.fontSize.h1};
+  color: ${({ theme }) => theme.colors.primary};
+  margin-bottom: ${({ theme }) => theme.spacing.md};
+`;
+
+const Subtitle = styled.p`
+  font-size: ${({ theme }) => theme.typography.fontSize.large};
+  color: ${({ theme }) => theme.colors.text};
+  max-width: 600px;
+  margin-bottom: ${({ theme }) => theme.spacing.lg};
+  opacity: 0.8;
+`;
+
+const UploadButton = styled.button`
+  padding: ${({ theme }) => `${theme.spacing.base} ${theme.spacing.lg}`};
+  background-color: ${({ theme }) => theme.colors.primary};
+  color: ${({ theme }) => theme.colors.surface};
+  border: none;
+  border-radius: ${({ theme }) => theme.borderRadius.base};
+  font-size: ${({ theme }) => theme.typography.fontSize.base};
+  font-weight: ${({ theme }) => theme.typography.fontWeight.medium};
+  cursor: pointer;
+  transition: ${({ theme }) => theme.transitions.base};
+  margin-bottom: ${({ theme }) => theme.spacing.lg};
+  
+  &:hover:not(:disabled) {
+    background-color: ${({ theme }) => theme.colors.accent};
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+const Features = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: ${({ theme }) => theme.spacing.lg};
+  max-width: 900px;
+`;
+
+const FeatureCard = styled.div`
+  background-color: ${({ theme }) => theme.colors.surface};
+  border-radius: ${({ theme }) => theme.borderRadius.base};
+  padding: ${({ theme }) => theme.spacing.lg};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  box-shadow: ${({ theme }) => theme.shadows.small};
+  width: 250px;
+  
+  h3 {
+    color: ${({ theme }) => theme.colors.primary};
+    margin-bottom: ${({ theme }) => theme.spacing.sm};
+  }
+  
+  p {
+    color: ${({ theme }) => theme.colors.text};
+    opacity: 0.7;
+    font-size: ${({ theme }) => theme.typography.fontSize.small};
+  }
+`;
+
+const AIFeature = styled.div`
+  margin-top: ${({ theme }) => theme.spacing.lg};
+  padding: ${({ theme }) => theme.spacing.md};
+  background-color: ${({ theme }) => theme.colors.primary}10;
+  border-radius: ${({ theme }) => theme.borderRadius.base};
+  max-width: 600px;
+  
+  h2 {
+    color: ${({ theme }) => theme.colors.primary};
+    margin-bottom: ${({ theme }) => theme.spacing.sm};
+  }
+  
+  p {
+    color: ${({ theme }) => theme.colors.text};
+    margin-bottom: ${({ theme }) => theme.spacing.sm};
+  }
+`;
+
+const UserSection = styled.div`
+  width: 100%;
+  max-width: 900px;
+  margin-bottom: ${({ theme }) => theme.spacing.lg};
+`;
+
+const SectionTitle = styled.h2`
+  font-size: ${({ theme }) => theme.typography.fontSize.h2};
+  color: ${({ theme }) => theme.colors.text};
+  margin-bottom: ${({ theme }) => theme.spacing.md};
+  text-align: left;
+`;
+
+const Tabs = styled.div`
+  display: flex;
+  margin-bottom: ${({ theme }) => theme.spacing.md};
+`;
+
+interface TabProps {
+  active: boolean;
+}
+
+const Tab = styled.button<TabProps>`
+  padding: ${({ theme }) => `${theme.spacing.sm} ${theme.spacing.md}`};
+  background: ${({ active, theme }) => active ? theme.colors.primary : 'transparent'};
+  color: ${({ active, theme }) => active ? theme.colors.surface : theme.colors.text};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-bottom: ${({ active }) => active ? 'none' : '1px solid'};
+  border-radius: ${({ theme }) => `${theme.borderRadius.small} ${theme.borderRadius.small} 0 0`};
+  cursor: pointer;
+  margin-right: ${({ theme }) => theme.spacing.sm};
+  
+  &:hover {
+    background: ${({ active, theme }) => active ? theme.colors.primary : theme.colors.border};
+  }
+`;
+
+const LandingPage: React.FC = () => {
+  const { handleFileUpload, loading, setData } = useSpreadsheet() || {};
+  const userContext = useUser() || {};
   const isSignedIn = userContext?.isSignedIn ?? false;
   const isLoaded = userContext?.isLoaded ?? true;
-  const [activeTab, setActiveTab] = useState("upload");
-
-  const handleLoadSpreadsheet = async (spreadsheet: any) => {
+  const [activeTab, setActiveTab] = useState<'upload' | 'saved'>('upload');
+  
+  const handleLoadSpreadsheet = async (spreadsheet: Spreadsheet) => {
+    if (!spreadsheet?.id) return;
+    
     try {
       const fullSpreadsheet = await getSpreadsheetById(spreadsheet.id);
-      if (fullSpreadsheet && fullSpreadsheet.data) {
-        setData(fullSpreadsheet.data, spreadsheet.name);
+      
+      if (fullSpreadsheet?.data && setData) {
+        setData(fullSpreadsheet.data, spreadsheet.name || 'Untitled');
       }
     } catch (error) {
-      console.error("Error loading spreadsheet:", error);
+      console.error('Error loading spreadsheet:', error);
     }
   };
-
+  
   return (
-    <div className="flex min-h-[80vh] flex-col items-center justify-start p-8 text-center">
-      <h1 className="mb-4 text-4xl font-bold text-primary">
-        Welcome to Cognisheet
-      </h1>
-      <p className="mb-8 max-w-[600px] text-lg text-muted-foreground">
-        A user-friendly spreadsheet tool with an AI chat interface for natural
-        language queries. Upload your CSV, Excel, or Numbers file and start asking
-        questions in plain English.
-      </p>
-
-      <Button
-        size="lg"
-        onClick={() => handleFileUpload(new File([], "test.csv"))}
-        disabled={loading}
-        className="mb-8"
-      >
-        {loading ? "Loading..." : "Upload Spreadsheet"}
-      </Button>
-
+    <Container>
+      <Title>Welcome to Cognisheet</Title>
+      <Subtitle>
+        A user-friendly spreadsheet tool with an AI chat interface for natural language queries.
+        Upload your CSV, Excel, or Numbers file and start asking questions in plain English.
+      </Subtitle>
+      
+      <UploadButton onClick={handleFileUpload} disabled={loading}>
+        {loading ? 'Loading...' : 'Upload Spreadsheet'}
+      </UploadButton>
+      
       {userContext && (
         <>
           {isLoaded && isSignedIn ? (
-            <div className="mb-8 w-full max-w-[900px]">
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="upload">Upload New</TabsTrigger>
-                  <TabsTrigger value="saved">Saved Spreadsheets</TabsTrigger>
-                </TabsList>
-                <TabsContent value="upload">
-                  <Button
-                    size="lg"
-                    onClick={() => handleFileUpload(new File([], "test.csv"))}
-                    disabled={loading}
-                    className="w-full"
-                  >
-                    {loading ? "Loading..." : "Upload Spreadsheet"}
-                  </Button>
-                </TabsContent>
-                <TabsContent value="saved">
-                  <SavedSpreadsheets onLoadSpreadsheet={handleLoadSpreadsheet} />
-                </TabsContent>
+            <UserSection>
+              <Tabs>
+                <Tab 
+                  active={activeTab === 'upload'} 
+                  onClick={() => setActiveTab('upload')}
+                >
+                  Upload New
+                </Tab>
+                <Tab 
+                  active={activeTab === 'saved'} 
+                  onClick={() => setActiveTab('saved')}
+                >
+                  Saved Spreadsheets
+                </Tab>
               </Tabs>
-            </div>
+              
+              {activeTab === 'upload' ? (
+                <UploadButton onClick={handleFileUpload} disabled={loading}>
+                  {loading ? 'Loading...' : 'Upload Spreadsheet'}
+                </UploadButton>
+              ) : (
+                <SavedSpreadsheets onLoadSpreadsheet={handleLoadSpreadsheet} />
+              )}
+            </UserSection>
           ) : (
-            isLoaded &&
-            !isSignedIn && (
-              <div className="mb-8 w-full max-w-[900px]">
-                <h2 className="mb-4 text-left text-2xl font-semibold text-foreground">
-                  Sign in to save your spreadsheets
-                </h2>
+            isLoaded && !isSignedIn && (
+              <UserSection>
+                <SectionTitle>Sign in to save your spreadsheets</SectionTitle>
                 <Auth />
-              </div>
+              </UserSection>
             )
           )}
         </>
       )}
-
-      <div className="mb-8 flex max-w-[900px] flex-wrap justify-center gap-8">
-        <Card className="w-[250px] p-6">
-          <h3 className="mb-2 text-lg font-semibold text-primary">
-            AI-Powered Analysis
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            Get intelligent insights from your data using our advanced AI
-            assistant.
-          </p>
-        </Card>
-
-        <Card className="w-[250px] p-6">
-          <h3 className="mb-2 text-lg font-semibold text-primary">
-            Instant Visualizations
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            Create charts and graphs with simple commands like "create a bar
-            chart".
-          </p>
-        </Card>
-
-        <Card className="w-[250px] p-6">
-          <h3 className="mb-2 text-lg font-semibold text-primary">
-            Easy Data Selection
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            Select data ranges with your mouse or use Cmd+K to select all data.
-          </p>
-        </Card>
-      </div>
-
-      <div className="max-w-[600px] rounded-lg bg-primary/10 p-6">
-        <h2 className="mb-2 text-xl font-semibold text-primary">
-          Powered by OpenAI
-        </h2>
-        <p className="text-muted-foreground">
-          Our AI assistant uses OpenAI's powerful language models to analyze your
-          data and provide meaningful insights.
-        </p>
-      </div>
-    </div>
+      
+      <Features>
+        <FeatureCard>
+          <h3>AI-Powered Analysis</h3>
+          <p>Get intelligent insights from your data using our advanced AI assistant.</p>
+        </FeatureCard>
+        
+        <FeatureCard>
+          <h3>Instant Visualizations</h3>
+          <p>Create charts and graphs with simple commands like "create a bar chart".</p>
+        </FeatureCard>
+        
+        <FeatureCard>
+          <h3>Easy Data Selection</h3>
+          <p>Select data ranges with your mouse or use Cmd+K to select all data.</p>
+        </FeatureCard>
+      </Features>
+      
+      <AIFeature>
+        <h2>Powered by OpenAI</h2>
+        <p>Our AI assistant uses OpenAI's powerful language models to analyze your data and provide meaningful insights.</p>
+      </AIFeature>
+    </Container>
   );
-} 
+};
+
+export default LandingPage; 

@@ -2,13 +2,13 @@ import React, { createContext, useState, useContext, useRef, useEffect } from 'r
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { useUser } from './UserContext';
-import { saveSpreadsheet } from '../services/supabase';
+import { saveSpreadsheet } from '../services/supabase.ts';
 
 // Create context
 const SpreadsheetContext = createContext();
 
 // Custom hook to use the spreadsheet context
-export const useSpreadsheet = () => useContext(SpreadsheetContext);
+export const useSpreadsheet = () => useContext(SpreadsheetContext) || {};
 
 export const SpreadsheetProvider = ({ children, onDataLoaded, onDataReset }) => {
   const [spreadsheetData, setSpreadsheetData] = useState(null);
@@ -28,7 +28,7 @@ export const SpreadsheetProvider = ({ children, onDataLoaded, onDataReset }) => 
 
   // Call onDataLoaded when rows are updated
   useEffect(() => {
-    if (rows && rows.length > 0 && onDataLoaded) {
+    if (rows?.length > 0 && onDataLoaded) {
       console.log('Rows loaded, calling onDataLoaded callback');
       onDataLoaded();
     }
@@ -302,12 +302,14 @@ export const SpreadsheetProvider = ({ children, onDataLoaded, onDataReset }) => 
 
   // Function to get data from selected range
   const getSelectedData = () => {
-    if (!selectedRange || !rows || rows.length === 0) return null;
+    if (!selectedRange || !rows?.length || !headers?.length) return null;
     
-    const { startRow, endRow, startCol, endCol } = selectedRange;
+    const { startRow, endRow, startCol, endCol } = selectedRange || {};
     
     // Validate range
-    if (startRow < 0 || endRow >= rows.length || startCol < 0 || endCol >= headers.length) {
+    if (!startRow || !endRow || !startCol || !endCol || 
+        startRow < 0 || endRow >= rows.length || 
+        startCol < 0 || endCol >= headers.length) {
       console.error('Invalid selection range');
       return null;
     }
@@ -318,7 +320,7 @@ export const SpreadsheetProvider = ({ children, onDataLoaded, onDataReset }) => 
       const rowData = [];
       for (let j = startCol; j <= endCol; j++) {
         const header = headers[j];
-        rowData.push(rows[i][header]);
+        rowData.push(rows[i]?.[header] || '');
       }
       selectedData.push(rowData);
     }
@@ -331,11 +333,11 @@ export const SpreadsheetProvider = ({ children, onDataLoaded, onDataReset }) => 
 
   // Function to get all data from the spreadsheet
   const getAllData = () => {
-    if (!rows || rows.length === 0 || !headers || headers.length === 0) return null;
+    if (!rows?.length || !headers?.length) return null;
     
     // Convert rows to a 2D array format
     const allData = rows.map(row => {
-      return headers.map(header => row[header]);
+      return headers.map(header => row?.[header] || '');
     });
     
     return {
@@ -351,7 +353,7 @@ export const SpreadsheetProvider = ({ children, onDataLoaded, onDataReset }) => 
       return;
     }
     
-    if (!spreadsheetData || !rows || rows.length === 0) {
+    if (!spreadsheetData?.data || !rows?.length) {
       setError('No spreadsheet data to save');
       return;
     }
@@ -363,8 +365,8 @@ export const SpreadsheetProvider = ({ children, onDataLoaded, onDataReset }) => 
       const spreadsheetToSave = {
         name: fileName || 'Untitled Spreadsheet',
         data: {
-          headers,
-          rows,
+          headers: headers || [],
+          rows: rows || [],
         }
       };
       
@@ -378,7 +380,7 @@ export const SpreadsheetProvider = ({ children, onDataLoaded, onDataReset }) => 
       }
     } catch (err) {
       console.error('Error saving spreadsheet:', err);
-      setError(`Error saving spreadsheet: ${err.message}`);
+      setError(err?.message || 'Error saving spreadsheet');
     } finally {
       setIsSaving(false);
     }
@@ -386,15 +388,15 @@ export const SpreadsheetProvider = ({ children, onDataLoaded, onDataReset }) => 
 
   // Function to set data directly (used when loading from saved spreadsheets)
   const setData = (data, name) => {
-    if (!data || !data.headers || !data.rows) {
+    if (!data?.headers || !data?.rows) {
       setError('Invalid data format');
       return;
     }
     
-    setHeaders(data.headers);
-    setRows(data.rows);
+    setHeaders(data.headers || []);
+    setRows(data.rows || []);
     setFileName(name || 'Loaded Spreadsheet');
-    setSpreadsheetData({ data: data.rows, meta: { fields: data.headers } });
+    setSpreadsheetData({ data: data.rows || [], meta: { fields: data.headers || [] } });
     
     // Call onDataLoaded callback
     if (onDataLoaded) {
@@ -422,16 +424,16 @@ export const SpreadsheetProvider = ({ children, onDataLoaded, onDataReset }) => 
 
   // Value object to be provided by the context
   const value = {
-    spreadsheetData,
-    headers,
-    rows,
-    fileName,
-    fileType,
-    selectedRange,
-    loading,
-    error,
-    isSaving,
-    saveSuccess,
+    spreadsheetData: spreadsheetData || null,
+    headers: headers || [],
+    rows: rows || [],
+    fileName: fileName || '',
+    fileType: fileType || '',
+    selectedRange: selectedRange || null,
+    loading: loading || false,
+    error: error || null,
+    isSaving: isSaving || false,
+    saveSuccess: saveSuccess || false,
     handleFileUpload,
     handleFileChange,
     handleCellSelection,
@@ -440,8 +442,8 @@ export const SpreadsheetProvider = ({ children, onDataLoaded, onDataReset }) => 
     saveCurrentSpreadsheet,
     setData,
     resetData,
-    charts,
-    activeChart,
+    charts: charts || [],
+    activeChart: activeChart || null,
     addChart,
     removeChart,
     getChartById,
